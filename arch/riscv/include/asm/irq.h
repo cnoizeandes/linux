@@ -17,6 +17,15 @@
 
 #define NR_IRQS         0
 
+/*
+ *  * Use this value to indicate lack of interrupt
+ *   * capability
+ *    */
+#ifndef NO_IRQ
+#define NO_IRQ  ((unsigned int)(-1))
+#endif
+
+
 #define INTERRUPT_CAUSE_SOFTWARE    1
 #define INTERRUPT_CAUSE_TIMER       5
 #define INTERRUPT_CAUSE_EXTERNAL    9
