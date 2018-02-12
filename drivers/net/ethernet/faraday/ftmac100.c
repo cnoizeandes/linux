@@ -285,12 +285,12 @@ static dma_addr_t ftmac100_rxdes_get_dma_addr(struct ftmac100_rxdes *rxdes)
  */
 static void ftmac100_rxdes_set_page(struct ftmac100_rxdes *rxdes, struct page *page)
 {
-	rxdes->rxdes3 = (unsigned int)page;
+	rxdes->rxdes3 = (uintptr_t)page;
 }
 
 static struct page *ftmac100_rxdes_get_page(struct ftmac100_rxdes *rxdes)
 {
-	return (struct page *)rxdes->rxdes3;
+	return (struct page *)(uintptr_t)rxdes->rxdes3;
 }
 
 /******************************************************************************
@@ -546,12 +546,12 @@ static dma_addr_t ftmac100_txdes_get_dma_addr(struct ftmac100_txdes *txdes)
  */
 static void ftmac100_txdes_set_skb(struct ftmac100_txdes *txdes, struct sk_buff *skb)
 {
-	txdes->txdes3 = (unsigned int)skb;
+	txdes->txdes3 = (uintptr_t)skb;
 }
 
 static struct sk_buff *ftmac100_txdes_get_skb(struct ftmac100_txdes *txdes)
 {
-	return (struct sk_buff *)txdes->txdes3;
+	return (struct sk_buff *)(uintptr_t)txdes->txdes3;
 }
 
 /******************************************************************************
