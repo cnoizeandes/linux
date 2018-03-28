@@ -41,13 +41,7 @@
     #size-cells = <2>;
     compatible = "ucbbar,spike-bare-soc", "simple-bus";
     ranges;
-/*
-    clint@e6000000 {
-      compatible = "riscv,clint0";
-      interrupts-extended = <&CPU0_intc 3 &CPU0_intc 7 >;
-      reg = <0x0 0xe6000000 0x0 0x100000>;
-    };
-*/
+
     plmt0@e6000000 {
       compatible = "riscv,plmt0";
       interrupts-extended = <&CPU0_intc 7>;
