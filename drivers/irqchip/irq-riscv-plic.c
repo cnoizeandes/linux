@@ -80,6 +80,21 @@
  * base + 0xFFE008: Reserved
  * ...
  * base + 0xFFFFFC: Reserved
+ *
+ * V5 Support:
+ *
+ * base + 0x000000: V5 Feature enable register (vectored/preempt)
+ *
+ * base + 0x001000: V5 Interrupt pending array
+ * base + 0x001080: V5 Trigger type array (read-only)
+ * base + 0x001100: V5 Number of interrupts and targets (read-only)
+ * base + 0x001104: V5 Version and max priority register (read-only)
+ *
+ * base + 0x200400: V5 Preempted priority stack for context 0
+ * ...
+ * base + 0x20041F: V5 Preempted priority stack for context 0
+ * base + 0x201400: V5 Preempted priority stack for context 1
+ * base + 0xFFE400: V5 Preempted priority stack for context 15871
  */
 
 /* Each interrupt source has a priority register associated with it. */
@@ -102,6 +117,21 @@
 #define CONTEXT_PER_HART	0x1000
 #define CONTEXT_THRESHOLD	0
 #define CONTEXT_CLAIM		4
+
+/* V5 Support */
+#ifdef CONFIG_PLIC_NCEPLIC100
+#define FEATURE_ENABLE_BASE	0
+#define FEATURE_PREEMPT		0
+#define FEATURE_VECTORED	1
+
+#define INFO_BASE		0x1000
+#define INFO_PENDING_RW		0x0
+#define INFO_TRIGGER_TYPE	0x80
+#define INFO_NUMBER		0x100
+#define INFO_VER_AND_MAX	0x104
+
+#define CONTEXT_PREEMPT		0x400	// base on CONTEXT_BASE
+#endif
 
 /*
  * PLIC devices are named like 'riscv,plic0,%llx', this is enough space to
@@ -150,6 +180,46 @@ u32 __iomem *plic_hart_claim(struct plic_data *data, int contextid)
 {
 	return data->reg + CONTEXT_BASE + CONTEXT_PER_HART * contextid + CONTEXT_CLAIM;
 }
+
+/* V5 support */
+#ifdef CONFIG_PLIC_NCEPLIC100
+static inline
+u32 __iomem *plic_hart_feature_enable(struct plic_data *data)
+{
+	return data->reg + FEATURE_ENABLE_BASE;
+}
+
+static inline
+u32 __iomem *plic_hart_pending(struct plic_data *data)
+{
+	return data->reg + INFO_BASE + INFO_PENDING_RW;
+}
+
+static inline
+u32 __iomem *plic_hart_trigger_type(struct plic_data *data)
+{
+	return data->reg + INFO_BASE + INFO_TRIGGER_TYPE;
+}
+
+static inline
+u32 __iomem *plic_hart_number(struct plic_data *data)
+{
+	return data->reg + INFO_BASE + INFO_NUMBER;
+}
+
+static inline
+u32 __iomem *plic_hart_version_and_max(struct plic_data *data)
+{
+	return data->reg + INFO_BASE + INFO_VER_AND_MAX;
+}
+
+static inline
+u32 __iomem *plic_hart_preempt(struct plic_data *data, int contextid)
+{
+	return data->reg +
+	       CONTEXT_BASE + CONTEXT_PER_HART * contextid + CONTEXT_PREEMPT;
+}
+#endif
 
 /*
  * Handling an interrupt is a two-step process: first you claim the interrupt
@@ -245,6 +315,85 @@ static int plic_irqdomain_map(struct irq_domain *d, unsigned int irq,
 
 	return 0;
 }
+
+/* V5 Support */
+#ifdef CONFIG_PLIC_NCEPLIC100
+static void plic_enable_preempt(struct plic_data *data)
+{
+	u32 __iomem *reg = plic_hart_feature_enable(data);
+	u32 mask = 1 << FEATURE_PREEMPT;
+
+	spin_lock(&data->lock);
+	writel(readl(reg) | mask, reg);
+	spin_unlock(&data->lock);
+}
+
+static void plic_disable_preempt(struct plic_data *data)
+{
+	u32 __iomem *reg = plic_hart_feature_enable(data);
+	u32 mask = ~(1 << FEATURE_PREEMPT);
+
+	spin_lock(&data->lock);
+	writel(readl(reg) & mask, reg);
+	spin_unlock(&data->lock);
+}
+
+static void plic_enable_pending(struct plic_data *data, int hwirq, int val)
+{
+	u32 __iomem *reg = plic_hart_pending(data) + (hwirq / 32);
+	u32 bit = 1 << (hwirq % 32);
+
+	spin_lock(&data->lock);
+	writel(readl(reg) | bit, reg);
+	spin_unlock(&data->lock);
+}
+
+static void plic_disable_pending(struct plic_data *data, int hwirq, int val)
+{
+	u32 __iomem *reg = plic_hart_pending(data) + (hwirq / 32);
+	u32 mask = ~(1 << (hwirq % 32));
+
+	spin_lock(&data->lock);
+	writel(readl(reg) & mask, reg);
+	spin_unlock(&data->lock);
+}
+
+static u32 plic_get_pending(struct plic_data *data, int hwirq)
+{
+	u32 __iomem *reg = plic_hart_pending(data) + (hwirq / 32);
+	u32 mask = 1 << (hwirq % 32);
+
+	return (readl(reg) & mask) >> (hwirq % 32);
+}
+
+static u32 plic_get_trigger_type(struct plic_data *data, int hwirq)
+{
+	u32 __iomem *reg = plic_hart_trigger_type(data) + (hwirq / 32);
+	u32 mask = 1 << (hwirq % 32);
+
+	return (readl(reg) & mask) >> (hwirq % 32);
+}
+
+static u32 plic_get_target_total(struct plic_data *data)
+{
+	return readl(plic_hart_number_target(data)) & 0x0000ffff;
+}
+
+static u32 plic_get_interrupt_total(struct plic_data *data)
+{
+	return readl(plic_hart_number_interrupt(data)) >> 16;
+}
+
+static u32 plic_get_version(struct plic_data *data)
+{
+	return readl(plic_hart_version_and_max(data)) & 0x0000ffff;
+}
+
+static u32 plic_get_max_priority(struct plic_data *data)
+{
+	return readl(plic_hart_version_and_max(data)) >> 16;
+}
+#endif
 
 static const struct irq_domain_ops plic_irqdomain_ops = {
 	.map	= plic_irqdomain_map,
