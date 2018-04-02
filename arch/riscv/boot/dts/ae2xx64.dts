@@ -58,6 +58,16 @@
       interrupts-extended = <&CPU0_intc 11 &CPU0_intc 9>;
     };
 
+    plic1: interrupt-controller@e6400000 {
+      compatible = "riscv,plic1";
+      #address-cells = <2>;
+      #interrupt-cells = <2>;
+      interrupt-controller;
+      reg = <0x0 0xe6400000 0x0 0x400000>;
+      riscv,ndev=<1>;
+      interrupts-extended = <&CPU0_intc 3>;
+    };
+
     serial0: serial@f0300000 {
       compatible = "andestech,uart16550", "ns16550a";
       reg = <0x0 0xf0300000 0x0 0x1000>;
