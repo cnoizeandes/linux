@@ -29,6 +29,20 @@
         compatible = "riscv,cpu-intc";
       };
     };
+    CPU1: cpu@1 {
+      device_type = "cpu";
+      reg = <1>;
+      status = "okay";
+      compatible = "riscv";
+      riscv,isa = "rv64imafdc";
+      mmu-type = "riscv,sv39";
+      clock-frequency = <60000000>;
+      CPU1_intc: interrupt-controller {
+        #interrupt-cells = <1>;
+        interrupt-controller;
+        compatible = "riscv,cpu-intc";
+      };
+    };
   };
 
   memory@0 {
@@ -44,7 +58,7 @@
 
     plmt0@e6000000 {
       compatible = "riscv,plmt0";
-      interrupts-extended = <&CPU0_intc 7>;
+      interrupts-extended = <&CPU0_intc 7 &CPU1_intc 7>;
       reg = <0x0 0xe6000000 0x0 0x100000>;
     };
 
@@ -55,7 +69,8 @@
       interrupt-controller;
       reg = <0x0 0xe4000000 0x0 0x2000000>;
       riscv,ndev=<31>;
-      interrupts-extended = <&CPU0_intc 11 &CPU0_intc 9>;
+      interrupts-extended = <&CPU0_intc 11 &CPU0_intc 9
+                             &CPU1_intc 11 &CPU1_intc 9>;
     };
 
     plic1: interrupt-controller@e6400000 {
@@ -64,8 +79,8 @@
       #interrupt-cells = <2>;
       interrupt-controller;
       reg = <0x0 0xe6400000 0x0 0x400000>;
-      riscv,ndev=<1>;
-      interrupts-extended = <&CPU0_intc 3>;
+      riscv,ndev=<2>;
+      interrupts-extended = <&CPU0_intc 3 &CPU1_intc 3>;
     };
 
     serial0: serial@f0300000 {
