@@ -61,5 +61,12 @@ static inline unsigned long cpuid_to_hartid_map(int cpu)
 	return boot_cpu_hartid;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+extern int __cpu_disable(void);
+extern void __cpu_die(unsigned int cpu);
+extern void cpu_play_dead(void);
+extern void boot_sec_cpu(void);
+#endif
+
 #endif /* CONFIG_SMP */
 #endif /* _ASM_RISCV_SMP_H */

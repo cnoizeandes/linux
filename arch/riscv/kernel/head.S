@@ -196,6 +196,20 @@ relocate:
 	j .Lsecondary_park
 END(_start)
 
+.section .text
+.global boot_sec_cpu
+
+#ifdef CONFIG_SMP
+boot_sec_cpu:
+	/* clear all pending flags */
+	csrw sip, zero
+	/* Mask all interrupts */
+	csrw sie, zero
+	fence
+
+	tail smp_callin
+#endif
+
 __PAGE_ALIGNED_BSS
 	/* Empty zero page */
 	.balign PAGE_SIZE
