@@ -139,7 +139,9 @@ asmlinkage void do_trap_break(struct pt_regs *regs)
 		type = report_bug(regs->sepc, regs);
 		switch (type) {
 		case BUG_TRAP_TYPE_NONE:
-			break;
+			do_trap_siginfo(SIGTRAP, TRAP_BRKPT, regs->sepc, current);
+			regs->sepc += 0x4;
+			return;
 		case BUG_TRAP_TYPE_WARN:
 			regs->sepc += sizeof(bug_insn_t);
 			return;
@@ -150,7 +152,6 @@ asmlinkage void do_trap_break(struct pt_regs *regs)
 #endif /* CONFIG_GENERIC_BUG */
 
 	do_trap_siginfo(SIGTRAP, TRAP_BRKPT, regs->sepc, current);
-	regs->sepc += 0x4;
 }
 
 #ifdef CONFIG_GENERIC_BUG
