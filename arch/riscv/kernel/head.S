@@ -48,6 +48,14 @@ ENTRY(_start)
 	mv s0, a0
 	mv s1, a1
 
+clear_bss:
+	la a0, __bss_start
+	la a1, __bss_stop
+clbss_l:
+	REG_S zero, 0(a0)
+	addi a0, a0, SZREG
+	ble a0, a1, clbss_l
+
 	/* Initialize page tables and relocate to virtual addresses */
 	la sp, init_thread_union + THREAD_SIZE
 	call setup_vm
