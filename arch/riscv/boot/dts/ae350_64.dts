@@ -42,12 +42,6 @@
     compatible = "andestech,riscv-ae350-soc";
     ranges;
 
-    plmt0@e6000000 {
-      compatible = "riscv,plmt0";
-      interrupts-extended = <&CPU0_intc 7>;
-      reg = <0x0 0xe6000000 0x0 0x100000>;
-    };
-
     plic0: interrupt-controller@e4000000 {
       compatible = "riscv,plic0";
       #address-cells = <2>;
@@ -68,32 +62,38 @@
       interrupts-extended = <&CPU0_intc 3>;
     };
 
-    serial0: serial@f0300000 {
-      compatible = "andestech,uart16550", "ns16550a";
-      reg = <0x0 0xf0300000 0x0 0x1000>;
-      interrupts = <9 4>;
-      clock-frequency = <19660800>;
-      reg-shift = <2>;
-      reg-offset = <32>;
-      no-loopback-test = <1>;
-      interrupt-parent = <&plic0>;
+    plmt0@e6000000 {
+      compatible = "riscv,plmt0";
+      interrupts-extended = <&CPU0_intc 7>;
+      reg = <0x0 0xe6000000 0x0 0x100000>;
     };
+  };
 
-    mac0: mac@e0100000 {
-      compatible = "andestech,atmac100";
-      reg = <0x0 0xe0100000 0x0 0x1000>;
-      interrupts = <19 4>;
-      interrupt-parent = <&plic0>;
-    };
+  serial0: serial@f0300000 {
+    compatible = "andestech,uart16550", "ns16550a";
+    reg = <0x0 0xf0300000 0x0 0x1000>;
+    interrupts = <9 4>;
+    clock-frequency = <19660800>;
+    reg-shift = <2>;
+    reg-offset = <32>;
+    no-loopback-test = <1>;
+    interrupt-parent = <&plic0>;
+  };
 
-    mmc0: mmc@f0e00000 {
-      compatible = "andestech,atfsdc010";
-      max-frequency = <100000000>;
-      clock-freq-min-max = <400000 100000000>;
-      fifo-depth = <0x10>;
-      reg = <0x0 0xf0e00000 0x0 0x1000>;
-      interrupts = <18 4>;
-      interrupt-parent = <&plic0>;
-    };
+  mac0: mac@e0100000 {
+    compatible = "andestech,atmac100";
+    reg = <0x0 0xe0100000 0x0 0x1000>;
+    interrupts = <19 4>;
+    interrupt-parent = <&plic0>;
+  };
+
+  mmc0: mmc@f0e00000 {
+    compatible = "andestech,atfsdc010";
+    max-frequency = <100000000>;
+    clock-freq-min-max = <400000 100000000>;
+    fifo-depth = <0x10>;
+    reg = <0x0 0xf0e00000 0x0 0x1000>;
+    interrupts = <18 4>;
+    interrupt-parent = <&plic0>;
   };
 };
