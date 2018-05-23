@@ -113,6 +113,7 @@
     fifo-depth = <0x10>;
     reg = <0x0 0xf0e00000 0x0 0x1000>;
     interrupts = <18 4>;
+    cap-sd-highspeed;
     interrupt-parent = <&plic0>;
   };
 
