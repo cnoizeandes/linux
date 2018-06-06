@@ -12,7 +12,7 @@
   } ;
 
   chosen {
-    bootargs = "console=ttyS0,38400n8 earlyprintk=uart8250-32bit,0xf0300000 debug loglevel=7";
+    bootargs = "console=ttyS0,38400n8 debug loglevel=7";
     stdout-path = "uart0:38400n8";
   };
 
