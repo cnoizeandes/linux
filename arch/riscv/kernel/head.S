@@ -162,6 +162,7 @@ END(_start)
 .section .text
 .global boot_sec_cpu
 
+#ifdef CONFIG_SMP
 boot_sec_cpu:
 	/* clear all pending flags */
 	csrw sip, zero
@@ -170,6 +171,7 @@ boot_sec_cpu:
 	fence
 
 	tail smp_callin
+#endif
 
 __PAGE_ALIGNED_BSS
 	/* Empty zero page */
