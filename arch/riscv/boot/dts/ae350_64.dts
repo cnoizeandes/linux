@@ -27,7 +27,7 @@
       compatible = "riscv";
       riscv,isa = "rv64imafdc";
       mmu-type = "riscv,sv39";
-      clock-frequency = <60000000>;
+      clock-frequency = <40000000>;
       CPU0_intc: interrupt-controller {
         #interrupt-cells = <1>;
         interrupt-controller;
