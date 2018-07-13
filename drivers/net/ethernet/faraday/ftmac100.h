@@ -35,6 +35,8 @@
 #define	FTMAC100_OFFSET_ITC		0x28
 #define	FTMAC100_OFFSET_APTC		0x2c
 #define	FTMAC100_OFFSET_DBLAC		0x30
+#define	FTMAC100_OFFSET_TXR_BADR_H	0x40
+#define	FTMAC100_OFFSET_RXR_BADR_H	0x44
 #define	FTMAC100_OFFSET_MACCR		0x88
 #define	FTMAC100_OFFSET_MACSR		0x8c
 #define	FTMAC100_OFFSET_PHYCR		0x90
@@ -138,7 +140,7 @@ struct ftmac100_txdes {
 	unsigned int	txdes0;
 	unsigned int	txdes1;
 	unsigned int	txdes2;	/* TXBUF_BADR */
-	unsigned int	txdes3;	/* not used by HW */
+	unsigned int	txdes3;	/* TXBUF_BADR_H */
 } __attribute__ ((aligned(16)));
 
 #define	FTMAC100_TXDES0_TXPKT_LATECOL	(1 << 0)
@@ -159,7 +161,7 @@ struct ftmac100_rxdes {
 	unsigned int	rxdes0;
 	unsigned int	rxdes1;
 	unsigned int	rxdes2;	/* RXBUF_BADR */
-	unsigned int	rxdes3;	/* not used by HW */
+	unsigned int	rxdes3;	/* RXBUF_BADR_H */
 } __attribute__ ((aligned(16)));
 
 #define	FTMAC100_RXDES0_RFL		0x7ff
@@ -176,5 +178,13 @@ struct ftmac100_rxdes {
 
 #define	FTMAC100_RXDES1_RXBUF_SIZE(x)	((x) & 0x7ff)
 #define	FTMAC100_RXDES1_EDORR		(1 << 31)
+
+struct ftmac100_txdes_ext {
+	void *skb;
+};
+
+struct ftmac100_rxdes_ext {
+	void *page;
+};
 
 #endif /* __FTMAC100_H */
