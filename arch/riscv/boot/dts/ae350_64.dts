@@ -117,6 +117,13 @@
     interrupt-parent = <&plic0>;
   };
 
+  lcd0: lcd@e0200000 {
+    compatible = "andestech,atflcdc100";
+    reg = <0x0 0xe0200000 0x0 0x1000>;
+    interrupts = <20 4>;
+    interrupt-parent = <&plic0>;
+  };
+
   smc0: smc@e0400000 {
     compatible = "andestech,atfsmc020";
     reg = <0x0 0xe0400000 0x0 0x1000>;
