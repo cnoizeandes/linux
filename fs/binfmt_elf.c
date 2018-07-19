@@ -414,7 +414,7 @@ static unsigned long total_mapping_size(struct elf_phdr *cmds, int nr)
  * header pointed to by elf_ex, into a newly allocated array. The caller is
  * responsible for freeing the allocated data. Returns an ERR_PTR upon failure.
  */
-static struct elf_phdr *load_elf_phdrs(struct elfhdr *elf_ex,
+struct elf_phdr *load_elf_phdrs(struct elfhdr *elf_ex,
 				       struct file *elf_file)
 {
 	struct elf_phdr *elf_phdata = NULL;

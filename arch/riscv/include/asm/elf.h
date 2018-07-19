@@ -57,14 +57,12 @@
  * but it's not easy, and we've already done it here.
  */
 #define ELF_HWCAP	(elf_hwcap)
-extern unsigned long elf_hwcap;
+extern unsigned int elf_hwcap;
+#define ELF_HWCAP2	(elf_hwcap2)
+extern unsigned int elf_hwcap2;
 
-/*
- * This yields a string that ld.so will use to load implementation
- * specific libraries for optimization.  This is more specific in
- * intent than poking at uname or /proc/cpuinfo.
- */
-#define ELF_PLATFORM	(NULL)
+#define ELF_PLATFORM	(elf_platform)
+extern const char *elf_platform;
 
 #define ARCH_DLINFO						\
 do {								\
@@ -78,4 +76,19 @@ struct linux_binprm;
 extern int arch_setup_additional_pages(struct linux_binprm *bprm,
 	int uses_interp);
 
+struct file;
+#ifdef CONFIG_64BIT
+struct elf64_phdr;
+extern int arch_elf_pt_proc(void *ehdr, struct elf64_phdr *phdr, struct file *elf,
+	bool is_interp, void *state);
+#else
+struct elf32_phdr;
+extern int arch_elf_pt_proc(void *ehdr, struct elf32_phdr *phdr, struct file *elf,
+	bool is_interp, void *state);
+#endif
+
+struct arch_elf_state {
+};
+#define INIT_ARCH_ELF_STATE { }
+#define arch_check_elf(ehdr, interp, interp_ehdr, state) (0)
 #endif /* _ASM_RISCV_ELF_H */

@@ -21,23 +21,15 @@
 #include <asm/processor.h>
 #include <asm/hwcap.h>
 
-unsigned long elf_hwcap __read_mostly;
+unsigned int elf_hwcap __read_mostly;
+unsigned int elf_hwcap2 __read_mostly;
+const char *elf_platform;
+EXPORT_SYMBOL(elf_platform);
 
 void riscv_fill_hwcap(void)
 {
 	struct device_node *node;
-	const char *isa;
-	size_t i;
-	static unsigned long isa2hwcap[256] = {0};
-
-	isa2hwcap['i'] = isa2hwcap['I'] = COMPAT_HWCAP_ISA_I;
-	isa2hwcap['m'] = isa2hwcap['M'] = COMPAT_HWCAP_ISA_M;
-	isa2hwcap['a'] = isa2hwcap['A'] = COMPAT_HWCAP_ISA_A;
-	isa2hwcap['f'] = isa2hwcap['F'] = COMPAT_HWCAP_ISA_F;
-	isa2hwcap['d'] = isa2hwcap['D'] = COMPAT_HWCAP_ISA_D;
-	isa2hwcap['c'] = isa2hwcap['C'] = COMPAT_HWCAP_ISA_C;
-
-	elf_hwcap = 0;
+	u32 major, minor;
 
 	/*
 	 * We don't support running Linux on hertergenous ISA systems.  For
@@ -49,13 +41,21 @@ void riscv_fill_hwcap(void)
 		return;
 	}
 
-	if (of_property_read_string(node, "riscv,isa", &isa)) {
+	if (of_property_read_string(node, "riscv,isa", &elf_platform)) {
 		pr_warning("Unable to find \"riscv,isa\" devicetree entry");
 		return;
 	}
+	pr_info("elf_platform is %s", elf_platform);
 
-	for (i = 0; i < strlen(isa); ++i)
-		elf_hwcap |= isa2hwcap[(unsigned char)(isa[i])];
+	if (of_property_read_u32(node, "riscv,priv-major", &major) ||
+	    of_property_read_u32(node, "riscv,priv-minor", &minor)) {
+		pr_warning("Unable to find \"riscv,priv*\" devicetree entry");
+		return;
+	}
+	pr_info("compatible privileged spec version %lld.%lld", major, minor);
 
-	pr_info("elf_hwcap is 0x%lx", elf_hwcap);
+	/* enabling ELF atrribute checking */
+	elf_hwcap = 1;
+	/* wrap up the priv spec version */
+	elf_hwcap2 = (major << 16) | minor;
 }
