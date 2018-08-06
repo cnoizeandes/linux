@@ -73,7 +73,7 @@ SECTIONS
 		_edata = .;
 	}
 
-	BSS_SECTION(0, 0, 0)
+	BSS_SECTION(0x10, 0, 0)
 
 	EXCEPTION_TABLE(0x10)
 	NOTES

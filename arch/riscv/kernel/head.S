@@ -54,7 +54,7 @@ clear_bss:
 clbss_l:
 	REG_S zero, 0(a0)
 	addi a0, a0, SZREG
-	ble a0, a1, clbss_l
+	blt a0, a1, clbss_l
 
 	/* Initialize page tables and relocate to virtual addresses */
 	la sp, init_thread_union + THREAD_SIZE
