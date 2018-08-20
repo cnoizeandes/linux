@@ -215,6 +215,11 @@ config FPU
 	bool "FPU support"
 	default y
 
+config NDS_V5
+	bool "Andes v5 support"
+	default n
+	select DMA_NONCOHERENT_OPS
+
 endmenu
 
 menu "Kernel type"
