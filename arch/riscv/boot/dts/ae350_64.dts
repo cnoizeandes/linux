@@ -28,6 +28,8 @@
       riscv,isa = "rv64imafdc";
       mmu-type = "riscv,sv39";
       clock-frequency = <60000000>;
+      d-cache-size = <0x8000>;
+      d-cache-line-size = <32>;
       CPU0_intc: interrupt-controller {
         #interrupt-cells = <1>;
         interrupt-controller;

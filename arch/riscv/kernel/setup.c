@@ -38,6 +38,7 @@
 #include <asm/sbi.h>
 #include <asm/tlbflush.h>
 #include <asm/thread_info.h>
+#include <asm/csr.h>
 
 #ifdef CONFIG_EARLY_PRINTK
 static void sbi_console_write(struct console *co, const char *buf,
@@ -126,7 +127,12 @@ pgd_t trampoline_pg_dir[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
 pmd_t swapper_pmd[PTRS_PER_PMD*((-PAGE_OFFSET)/PGDIR_SIZE)] __page_aligned_bss;
 pmd_t trampoline_pmd[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
 #endif
-
+phys_addr_t pa_msb;
+asmlinkage void __init setup_maxpa(void)
+{
+	csr_write(satp, SATP_PPN);
+	pa_msb = (csr_read(satp) + 1) >>1;
+}
 asmlinkage void __init setup_vm(void)
 {
 	extern char _start;

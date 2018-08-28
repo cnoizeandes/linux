@@ -58,6 +58,7 @@ clbss_l:
 
 	/* Initialize page tables and relocate to virtual addresses */
 	la sp, init_thread_union + THREAD_SIZE
+	call setup_maxpa
 	call setup_vm
 	call relocate
 
