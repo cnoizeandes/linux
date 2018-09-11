@@ -40,40 +40,6 @@ static void dma_flush_page(struct page *page, size_t size)
 }
 
 
-void *arch_dma_alloc(struct device *dev, size_t size,
-			      dma_addr_t * handle, gfp_t gfp,
-				      unsigned long attrs)
-{
-	void* kvaddr, *coherent_kvaddr;
-	size = PAGE_ALIGN(size);
-
-	kvaddr = swiotlb_alloc(dev, size, handle, gfp, attrs);
-	if (!kvaddr)
-		goto no_mem;
-	coherent_kvaddr = dma_remap(dma_to_phys(dev, *handle), size);
-	if (!coherent_kvaddr)
-		goto no_map;
-
-	dma_flush_page(virt_to_page(kvaddr),size);
-	return coherent_kvaddr;
-no_map:
-	swiotlb_free(dev, size, kvaddr, *handle, attrs);
-no_mem:
-	return NULL;
-}
-
-void arch_dma_free(struct device *dev, size_t size, void *vaddr,
-			   dma_addr_t handle, unsigned long attrs)
-{
-	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, handle));
-	
-	size = PAGE_ALIGN(size);
-	dma_unmap(vaddr);
-	swiotlb_free(dev, size, swiotlb_addr, handle, attrs);
-
-	return;
-}
-
 static inline void cache_op(phys_addr_t paddr, size_t size,
 		void (*fn)(unsigned long start, unsigned long end))
 {
@@ -111,6 +77,73 @@ void arch_sync_dma_for_cpu(struct device *dev, phys_addr_t paddr,
 	default:
 		BUG();
 	}
+}
+#ifdef CONFIG_32BIT
+void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+		gfp_t gfp, unsigned long attrs)
+{
+	void* kvaddr, *coherent_kvaddr;
+	size = PAGE_ALIGN(size);
+
+	kvaddr = dma_direct_alloc(dev, size, handle, gfp, attrs);
+	if (!kvaddr)
+		goto no_mem;
+	coherent_kvaddr = dma_remap(dma_to_phys(dev, *handle), size);
+	if (!coherent_kvaddr)
+		goto no_map;
+
+	dma_flush_page(virt_to_page(kvaddr),size);
+	return coherent_kvaddr;
+no_map:
+	dma_direct_free(dev, size, kvaddr, *handle, attrs);
+no_mem:
+	return NULL;
+}
+
+void arch_dma_free(struct device *dev, size_t size, void *vaddr,
+		dma_addr_t handle, unsigned long attrs)
+{
+	void *kvaddr = phys_to_virt(dma_to_phys(dev, handle));
+
+	size = PAGE_ALIGN(size);
+	dma_unmap(vaddr);
+	dma_direct_free(dev, size, kvaddr, handle, attrs);
+
+	return;
+}
+#else
+void *arch_dma_alloc(struct device *dev, size_t size,
+			      dma_addr_t * handle, gfp_t gfp,
+				      unsigned long attrs)
+{
+	void* kvaddr, *coherent_kvaddr;
+	size = PAGE_ALIGN(size);
+
+	kvaddr = swiotlb_alloc(dev, size, handle, gfp, attrs);
+	if (!kvaddr)
+		goto no_mem;
+	coherent_kvaddr = dma_remap(dma_to_phys(dev, *handle), size);
+	if (!coherent_kvaddr)
+		goto no_map;
+
+	dma_flush_page(virt_to_page(kvaddr),size);
+	return coherent_kvaddr;
+no_map:
+	swiotlb_free(dev, size, kvaddr, *handle, attrs);
+no_mem:
+	return NULL;
+}
+
+void arch_dma_free(struct device *dev, size_t size, void *vaddr,
+			   dma_addr_t handle, unsigned long attrs)
+{
+	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, handle));
+
+	size = PAGE_ALIGN(size);
+	dma_unmap(vaddr);
+	swiotlb_free(dev, size, swiotlb_addr, handle, attrs);
+
+	return;
 }
 
 
@@ -226,3 +259,4 @@ const struct dma_map_ops swiotlb_noncoh_dma_ops = {
 };
 
 EXPORT_SYMBOL(swiotlb_noncoh_dma_ops);
+#endif
