@@ -611,3 +611,6 @@ config GENERIC_CMPDI2
 
 config GENERIC_UCMPDI2
 	bool
+
+config GENERIC_LIB_UMODDI3
+	bool
