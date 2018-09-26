@@ -15,7 +15,7 @@
 #ifndef _ASM_RISCV_IRQ_H
 #define _ASM_RISCV_IRQ_H
 
-#define NR_IRQS         0
+#define NR_IRQS	72
 
 /*
  *  * Use this value to indicate lack of interrupt

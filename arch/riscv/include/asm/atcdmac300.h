@@ -1,14 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- *            Copyright Andes Technology Corporation 2007-2008
- *                         All Rights Reserved.
- *
- *  Revision History:
- *
- *    Aug.21.2007     Created.
- *
- *  DESCRIPTION
- *
- *   DMA controller driver internal supplement library.
+ * Copyright (C) 2018 Andes Technology Corporation
  *
  */
 
@@ -358,7 +350,7 @@ typedef struct dmad_chreq
 	 */
 	dma_addr_t ring_base;               /* (in)  ring buffer base (pa) */
 	dma_addr_t ring_size;               /* (in)  unit of data width */
-	addr_t     dev_addr;                /* (in)  device data port address */
+	dma_addr_t     dev_addr;                /* (in)  device data port address */
 	dma_addr_t periods;                 /* (in)  number of ints per ring */
 	dma_addr_t period_size;             /* (in)  size per int, data-width */
 

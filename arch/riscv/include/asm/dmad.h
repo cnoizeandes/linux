@@ -1,14 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- *            Copyright Andes Technology Corporation 2007-2008
- *                         All Rights Reserved.
- *
- *  Revision History:
- *
- *    Aug.21.2007     Created.
- *
- *  DESCRIPTION
- *
- *   DMA controller driver internal supplement library.
+ * Copyright (C) 2018 Andes Technology Corporation
  *
  */
 

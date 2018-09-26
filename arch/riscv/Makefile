@@ -77,7 +77,7 @@ KBUILD_CFLAGS += $(call cc-option,-mstrict-align)
 
 head-y := arch/riscv/kernel/head.o
 
-core-y += arch/riscv/kernel/ arch/riscv/mm/
+core-y += arch/riscv/kernel/ arch/riscv/mm/ arch/riscv/platforms/
 core-$(CONFIG_NDS_V5) += arch/riscv/andesv5/
 
 libs-y += arch/riscv/lib/

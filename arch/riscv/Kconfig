@@ -224,6 +224,8 @@ endmenu
 
 menu "Kernel type"
 
+source "arch/riscv/platforms/Kconfig"
+
 source "mm/Kconfig"
 
 source "kernel/Kconfig.preempt"
