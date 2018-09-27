@@ -184,8 +184,14 @@ typedef struct channel_control
 /* Assignment of DMA hardware handshake ID */
 #define DMAC_REQN_SPITX			0
 #define DMAC_REQN_SPIRX			1
+#ifdef CONFIG_PLAT_AE350
+#define DMAC_REQN_I2SAC97TX		14
+#define DMAC_REQN_I2SAC97RX		15
+#else
+
 #define DMAC_REQN_I2SAC97TX		2
 #define DMAC_REQN_I2SAC97RX		3
+#endif
 #define DMAC_REQN_UART1TX		4
 #define DMAC_REQN_UART1RX		5
 #define DMAC_REQN_UART2TX		6
