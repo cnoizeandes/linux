@@ -510,7 +510,7 @@ out_noexec:
 	return -ENOEXEC;
 }
 
-int arch_elf_pt_proc(void *ehdr, struct elf64_phdr *phdr, struct file *elf,
+int arch_elf_pt_proc(void *ehdr, struct elf_phdr *phdr, struct file *elf,
 	bool is_interp, void *state)
 {
 	int retval = 0;
