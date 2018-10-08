@@ -145,6 +145,7 @@
     compatible = "andestech,atfac97";
     reg = <0x0 0xf0d00000 0x0 0x1000>;
     interrupts = <17 4>;
+    interrupt-parent = <&plic0>;
   };
 
   virtio_mmio@fe007000 {
