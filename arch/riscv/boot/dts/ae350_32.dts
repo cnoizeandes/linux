@@ -85,7 +85,7 @@
   timer0: timer@f0400000 {
     compatible = "andestech,atcpit100";
     reg = <0xf0400000 0x1000>;
-    clock-frequency = <40000000>;
+    clock-frequency = <60000000>;
     interrupts = <3 4>;
     interrupt-parent = <&plic0>;
   };
