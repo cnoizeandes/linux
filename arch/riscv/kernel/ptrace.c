@@ -18,6 +18,7 @@
 #include <asm/ptrace.h>
 #include <asm/syscall.h>
 #include <asm/thread_info.h>
+#include <asm/sbi.h>
 #include <linux/ptrace.h>
 #include <linux/elf.h>
 #include <linux/regset.h>
@@ -81,6 +82,7 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
 void ptrace_disable(struct task_struct *child)
 {
 	clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
+	user_disable_single_step(child);
 }
 
 long arch_ptrace(struct task_struct *child, long request,
@@ -95,6 +97,26 @@ long arch_ptrace(struct task_struct *child, long request,
 	}
 
 	return ret;
+}
+
+void user_enable_single_step(struct task_struct *child)
+{
+	set_tsk_thread_flag(child, TIF_SINGLESTEP);
+}
+
+void user_disable_single_step(struct task_struct *child)
+{
+	clear_tsk_thread_flag(child, TIF_SINGLESTEP);
+}
+
+#define TRIGGER_TYPE_ICOUNT 3
+#define ICOUNT 1
+void do_singlestep(void)
+{
+	if (test_thread_flag(TIF_SINGLESTEP))
+		sbi_set_trigger(TRIGGER_TYPE_ICOUNT, ICOUNT, 1);
+	else
+		sbi_set_trigger(TRIGGER_TYPE_ICOUNT, ICOUNT, 0);
 }
 
 /*
@@ -115,8 +137,9 @@ void do_syscall_trace_enter(struct pt_regs *regs)
 
 void do_syscall_trace_exit(struct pt_regs *regs)
 {
+	int step = test_thread_flag(TIF_SINGLESTEP);
 	if (test_thread_flag(TIF_SYSCALL_TRACE))
-		tracehook_report_syscall_exit(regs, 0);
+		tracehook_report_syscall_exit(regs, step);
 
 #ifdef CONFIG_HAVE_SYSCALL_TRACEPOINTS
 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))

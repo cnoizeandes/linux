@@ -66,6 +66,7 @@ struct pt_regs {
 #define REG_FMT "%08lx"
 #endif
 
+#define arch_has_single_step()	(1)
 #define user_mode(regs) (((regs)->sstatus & SR_SPP) == 0)
 
 
