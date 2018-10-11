@@ -292,6 +292,7 @@ static bool riscv_base_isa_compatible(const char** elf_isa,
 	int elf_base = -1;
 	int host_base = -1;
 	int i;
+	const char* elf_orig = *elf_isa;
 
 	for (i = 0; i < RISCV_NUM_BASE_ISA; i++) {
 		size_t len = strlen(base_isas[i]);
@@ -323,7 +324,7 @@ static bool riscv_base_isa_compatible(const char** elf_isa,
 
 	return true;
 out_invalid_base:
-	pr_warn("Invalid base ISA `%s'", *elf_isa);
+	pr_warn("Invalid base ISA `%s'", elf_orig);
 	return false;
 }
 
