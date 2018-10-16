@@ -76,6 +76,7 @@ struct linux_binprm;
 extern int arch_setup_additional_pages(struct linux_binprm *bprm,
 	int uses_interp);
 
+#ifdef CONFIG_ARCH_BINFMT_ELF_STATE
 struct file;
 #ifdef CONFIG_64BIT
 struct elf64_phdr;
@@ -86,9 +87,9 @@ struct elf32_phdr;
 extern int arch_elf_pt_proc(void *ehdr, struct elf32_phdr *phdr, struct file *elf,
 	bool is_interp, void *state);
 #endif
-
 struct arch_elf_state {
 };
 #define INIT_ARCH_ELF_STATE { }
 #define arch_check_elf(ehdr, interp, interp_ehdr, state) (0)
+#endif
 #endif /* _ASM_RISCV_ELF_H */

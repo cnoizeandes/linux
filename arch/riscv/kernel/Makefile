@@ -13,7 +13,9 @@ extra-y += vmlinux.lds
 obj-y	+= cpu.o
 obj-y	+= cpufeature.o
 obj-y	+= entry.o
+ifdef CONFIG_ARCH_BINFMT_ELF_STATE
 obj-y	+= elf.o
+endif
 obj-y	+= irq.o
 obj-y	+= process.o
 obj-y	+= ptrace.o

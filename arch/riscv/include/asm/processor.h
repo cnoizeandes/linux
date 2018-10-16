@@ -91,6 +91,9 @@ struct device_node;
 extern int riscv_of_processor_hart(struct device_node *node);
 
 extern void riscv_fill_hwcap(void);
+#ifdef CONFIG_ARCH_BINFMT_ELF_STATE
+extern unsigned int elf_attribute_checking;
+#endif
 
 #endif /* __ASSEMBLY__ */
 
