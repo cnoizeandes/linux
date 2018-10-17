@@ -216,6 +216,10 @@ endmenu
 config FPU
 	bool "FPU support"
 	default y
+	help
+	  Say N here if you want to disable all floating-point related procedure
+	  in the kernel.
+	  If you don't know what to do here, say Y.
 
 config NDS_V5
 	bool "Andes v5 support"
