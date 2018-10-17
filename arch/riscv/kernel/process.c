@@ -83,7 +83,7 @@ void show_regs(struct pt_regs *regs)
 void start_thread(struct pt_regs *regs, unsigned long pc,
 	unsigned long sp)
 {
-#ifdef CONFIG_FPU
+#ifdef __riscv_flen
 	regs->sstatus = SR_SPIE /* User mode, irqs on */ | SR_FS_INITIAL;
 #else
 	regs->sstatus = SR_SPIE | SR_FS_OFF;
@@ -105,9 +105,7 @@ void flush_thread(void)
 
 int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 {
-#ifdef CONFIG_FPU
 	fstate_save(src, task_pt_regs(src));
-#endif
 	*dst = *src;
 	return 0;
 }
