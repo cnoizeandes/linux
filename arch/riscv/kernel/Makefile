@@ -16,6 +16,7 @@ obj-y	+= entry.o
 ifdef CONFIG_ARCH_BINFMT_ELF_STATE
 obj-y	+= elf.o
 endif
+obj-y	+= fpu.o
 obj-y	+= irq.o
 obj-y	+= process.o
 obj-y	+= ptrace.o
