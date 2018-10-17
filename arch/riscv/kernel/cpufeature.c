@@ -25,6 +25,9 @@ unsigned int elf_hwcap __read_mostly;
 unsigned int elf_hwcap2 __read_mostly;
 const char *elf_platform;
 EXPORT_SYMBOL(elf_platform);
+#ifdef CONFIG_FPU
+bool has_fpu __read_mostly;
+#endif
 
 void riscv_fill_hwcap(void)
 {
@@ -58,4 +61,9 @@ void riscv_fill_hwcap(void)
 	elf_hwcap = 1;
 	/* wrap up the priv spec version */
 	elf_hwcap2 = (major << 16) | minor;
+
+#ifdef CONFIG_FPU
+       if (strstr(elf_platform, "f2p0") && strstr(elf_platform, "d2p0"))
+               has_fpu = true;
+#endif
 }
