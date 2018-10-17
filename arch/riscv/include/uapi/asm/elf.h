@@ -19,7 +19,13 @@ typedef unsigned long elf_greg_t;
 typedef struct user_regs_struct elf_gregset_t;
 #define ELF_NGREG (sizeof(elf_gregset_t) / sizeof(elf_greg_t))
 
+/*
+ * Use 32-bits wide as fpr register size. Because there is a 32-bits wide
+ * register 'fcsr' at the end of fp state structure.
+ */
+typedef u32 elf_fpreg_t;
 typedef union __riscv_fp_state elf_fpregset_t;
+#define ELF_NFPREG (sizeof(elf_fpregset_t) / sizeof(elf_fpreg_t))
 
 #if __riscv_xlen == 64
 #define ELF_RISCV_R_SYM(r_info)		ELF64_R_SYM(r_info)

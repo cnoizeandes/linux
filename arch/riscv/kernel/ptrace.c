@@ -28,7 +28,8 @@
 #include <trace/events/syscalls.h>
 
 enum riscv_regset {
-	REGSET_X,
+	REGSET_GPR,
+	REGSET_FPR,
 };
 
 static int riscv_gpr_get(struct task_struct *target,
@@ -55,9 +56,52 @@ static int riscv_gpr_set(struct task_struct *target,
 	return ret;
 }
 
+#ifdef CONFIG_FPU
+extern bool has_fpu;
+
+static int riscv_fpr_get(struct task_struct *target,
+			 const struct user_regset *regset,
+			 unsigned int pos, unsigned int count,
+			 void *kbuf, void __user *ubuf)
+{
+	int err;
+	elf_fpregset_t fstate;
+
+	if (!has_fpu)
+		return -EIO;
+
+	fstate.d = target->thread.fstate;
+
+	err = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+				  &fstate,
+				  0, sizeof(fstate));
+	return err;
+}
+
+static int riscv_fpr_set(struct task_struct *target,
+			 const struct user_regset *regset,
+			 unsigned int pos, unsigned int count,
+			 const void *kbuf, const void __user *ubuf)
+{
+	int err;
+	elf_fpregset_t newstate;
+
+	if (!has_fpu)
+		return -EIO;
+
+	err = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+				 &newstate, 0, sizeof(newstate));
+	if (err)
+		return err;
+
+	target->thread.fstate = newstate.d;
+
+	return err;
+}
+#endif
 
 static const struct user_regset riscv_user_regset[] = {
-	[REGSET_X] = {
+	[REGSET_GPR] = {
 		.core_note_type = NT_PRSTATUS,
 		.n = ELF_NGREG,
 		.size = sizeof(elf_greg_t),
@@ -65,6 +109,16 @@ static const struct user_regset riscv_user_regset[] = {
 		.get = &riscv_gpr_get,
 		.set = &riscv_gpr_set,
 	},
+#ifdef CONFIG_FPU
+	[REGSET_FPR] = {
+		.core_note_type = NT_PRFPREG,
+		.n = ELF_NFPREG,
+		.size = sizeof(elf_fpreg_t),
+		.align = sizeof(elf_fpreg_t),
+		.get = &riscv_fpr_get,
+		.set = &riscv_fpr_set,
+	},
+#endif
 };
 
 static const struct user_regset_view riscv_user_native_view = {
