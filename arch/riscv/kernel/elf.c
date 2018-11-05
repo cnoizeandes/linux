@@ -14,13 +14,13 @@
 unsigned int elf_attribute_checking = 1;
 EXPORT_SYMBOL(elf_attribute_checking);
 
-static const char *strcasechr(const char *str, int c)
+static const char *strcasechr(const char *str, char c)
 {
 	const char *s = str;
-	for (; tolower(*s) != tolower((char)c); s++)
+	for (; tolower(*s) != tolower(c); s++)
 		if (*s == '\0')
 			return NULL;
-	return (const char *)s;
+	return s;
 }
 
 char parse_byte(const char** buf, const char* end)
