@@ -21,6 +21,7 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/of_dma.h>
+#include <linux/math64.h>
 
 resource_size_t	dmac_base;
 
@@ -112,14 +113,14 @@ typedef struct dmad_drq {
 
 	/* ring-mode fields are valid for DMAD_FLAGS_RING_MODE */
 	dma_addr_t ring_base;	/* ring buffer base address */
-	dma_addr_t ring_size;	/* size (of data width) */
+	int ring_size;	/* size (of data width) */
 	unsigned long ring_port;	/* for setup/fetch hw_ptr */
 	dmad_drb *ring_drb;
 
 	addr_t dev_addr;	/* device data port */
 
 	int periods;		/* interrupts periods */
-	dma_addr_t period_size;	/* of dma data with */
+	int period_size;	/* of dma data with */
 	dma_addr_t period_bytes;	/* Period size, in bytes */
 
 	/* ring_size - period_size * periods */
@@ -1904,8 +1905,9 @@ int dmad_update_ring_sw_ptr(dmad_chreq * ch_req,
 	dmad_drq *drq;
 	unsigned long lock_flags;
 	dma_addr_t hw_off = 0, ring_ptr;
-	dma_addr_t sw_p_off, ring_p_off, period_size, period_bytes;
+	dma_addr_t sw_p_off, ring_p_off, period_bytes;
 	dma_addr_t remnant_size;
+	int period_size;
 	int sw_p_idx, ring_p_idx, period, periods;
 	dmad_drb *drb = NULL;
 
@@ -1938,7 +1940,7 @@ int dmad_update_ring_sw_ptr(dmad_chreq * ch_req,
 	ring_p_off = drq->sw_p_off;
 
 	sw_p_idx = (int)(sw_ptr / period_size);
-	sw_p_off = sw_ptr % period_size;
+	__iter_div_u64_rem(sw_ptr, period_size, &sw_p_off);
 
 	if (remnant_size && (sw_p_idx == periods)) {
 		--sw_p_idx;
@@ -2174,7 +2176,7 @@ int dmad_update_ring_sw_ptr(dmad_chreq * ch_req,
 			dmad_submit_request_internal(drq, drb);
 	}
 
-	drq->sw_ptr = sw_ptr % drq->ring_size;
+	__iter_div_u64_rem(sw_ptr, drq->ring_size, &drq->sw_ptr);
 	drq->sw_p_idx = sw_p_idx % periods;
 	drq->sw_p_off = sw_p_off;
 
