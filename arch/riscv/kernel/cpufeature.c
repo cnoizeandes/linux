@@ -55,7 +55,7 @@ void riscv_fill_hwcap(void)
 		pr_warning("Unable to find \"riscv,priv*\" devicetree entry");
 		return;
 	}
-	pr_info("compatible privileged spec version %lld.%lld", major, minor);
+	pr_info("compatible privileged spec version %d.%d", major, minor);
 
 	/* enabling ELF atrribute checking */
 	elf_hwcap = 1;
