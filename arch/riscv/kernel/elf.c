@@ -198,8 +198,8 @@ static bool riscv_extension_compatible(const char** elf_isa,
 	const char **host_isa)
 {
 	char ch;
-	char *prev_pos = NULL;
-	char *curr_pos = NULL;
+	const char *prev_pos = NULL;
+	const char *curr_pos = NULL;
 
 	while (**elf_isa != '\0') {
 		if (**elf_isa == 'x' || **elf_isa == 'X')
@@ -376,7 +376,7 @@ static int parse_riscv_attributes(const char* buf, const char* end)
 {
 	unsigned long tag;
 	const char* isa;
-	struct riscv_version priv;
+	struct riscv_version priv = {.major = 0, .minor = 0};
 	int total_check = 0;
 
 	while (buf < end) {
