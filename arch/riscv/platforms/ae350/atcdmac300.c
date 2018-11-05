@@ -2427,7 +2427,7 @@ int __exit dmad_module_exit(struct platform_device *pdev)
 	memset(&dmad, 0, sizeof(dmad));
 
 	/* release I/O space */
-	release_region((resource_size_t)pdata->dmac_regs, resource_size(pdata->io));
+	release_region((uintptr_t)pdata->dmac_regs, resource_size(pdata->io));
 	dmad_dbg("DMA module unloaded!\n");
 
 	return 0;
@@ -2491,7 +2491,7 @@ static int atcdma_probe(struct platform_device *pdev)
 	}
 
 	pdata->dmac_regs = (void __iomem *) ioremap(mem->start, resource_size(io));
-	dmac_base = (resource_size_t)pdata->dmac_regs;
+	dmac_base = (uintptr_t)pdata->dmac_regs;
 
 	irq = platform_get_irq(pdev, 0);
 
