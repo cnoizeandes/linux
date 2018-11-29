@@ -2387,9 +2387,9 @@ int dmad_module_init(void)
 	spin_lock_init(&dmad.drq_pool_lock);
 	dmad.ahb_drq_pool = dmad.drq_pool;
 	dmad_dbg("DMA module init result: (%d)\n", err);
-	dmad_dbg("  AHB channels: %d; APB channels %d; "
+	dmad_dbg("  AHB channels: %d\n;"
 		 "DRBs per channel: %d\n",
-		 DMAC_MAX_CHANNELS, APBBR_DMA_MAX_CHANNELS, DMAD_DRB_POOL_SIZE);
+		 DMAC_MAX_CHANNELS, DMAD_DRB_POOL_SIZE);
 
 	dmad_dbg("%s() return code (%d) <<\n", __func__, err);
 	return err;
