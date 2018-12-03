@@ -376,12 +376,12 @@ static u32 plic_get_trigger_type(struct plic_data *data, int hwirq)
 
 static u32 plic_get_target_total(struct plic_data *data)
 {
-	return readl(plic_hart_number_target(data)) & 0x0000ffff;
+	return readl(plic_hart_number(data)) & 0x0000ffff;
 }
 
 static u32 plic_get_interrupt_total(struct plic_data *data)
 {
-	return readl(plic_hart_number_interrupt(data)) >> 16;
+	return readl(plic_hart_number(data)) >> 16;
 }
 
 static u32 plic_get_version(struct plic_data *data)
