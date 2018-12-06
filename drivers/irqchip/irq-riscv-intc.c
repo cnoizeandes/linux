@@ -161,10 +161,10 @@ static void riscv_irq_enable(struct irq_data *d)
 	 */
 	if (data->hart == smp_processor_id())
 		riscv_irq_unmask(d);
-	else if (cpu_online(data->hart))
+	else if (cpu_online(data->hart)) // BUG: other cores not be brought in this phase
 		riscv_remote_ctrl(data->hart, riscv_irq_enable_helper, d);
-	else
-		WARN_ON_ONCE(1);
+	//else
+		//WARN_ON_ONCE(1);
 }
 
 static void riscv_irq_disable(struct irq_data *d)
