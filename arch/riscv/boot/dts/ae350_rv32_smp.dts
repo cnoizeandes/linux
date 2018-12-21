@@ -92,14 +92,8 @@
 
     plmt0@e6000000 {
       compatible = "riscv,plmt0";
-      interrupts-extended = <&CPU0_intc 7>;
+      interrupts-extended = <&CPU0_intc 7 &CPU1_intc 7>;
       reg = <0xe6000000 0x100000>;
-    };
-
-    plmt1@e6100000 {
-      compatible = "riscv,plmt0";
-      interrupts-extended = <&CPU1_intc 7>;
-      reg = <0xe6100000 0x100000>;
     };
   };
 
