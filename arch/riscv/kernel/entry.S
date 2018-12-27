@@ -229,7 +229,7 @@ ret_from_exception:
 	REG_L s0, PT_SSTATUS(sp)
 	csrc sstatus, SR_SIE
 	andi s0, s0, SR_SPP
-	bnez s0, restore_all
+	bnez s0, resume_kernel
 
 resume_userspace:
 	/* Interrupts must be disabled here so flags are checked atomically */
@@ -249,10 +249,20 @@ resume_userspace:
 	 * again.
 	 */
 	csrw sscratch, tp
+	j lala
 
-restore_all:
+resume_kernel:
+	REG_L s0, TASK_PREEMPT_CONT(tp)
+	bnez s0, lala
+	la ra, ret_from_exception
+	REG_L s0, TASK_TI_FLAGS(tp) /* current_thread_info->flags */
+	andi s0, s0, _TIF_NEED_RESCHED
+	beqz s0, lala
+	tail schedule
+lala:
 	RESTORE_ALL
 	sret
+
 
 work_pending:
 	/* Enter slow path for supplementary processing */
