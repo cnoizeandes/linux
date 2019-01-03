@@ -1352,6 +1352,16 @@ config RTC_DRV_S3C
 	  This driver can also be build as a module. If so, the module
 	  will be called rtc-s3c.
 
+config RTC_DRV_ATCRTC100
+	tristate "AE3XX Real Time Clock"
+	depends on RISCV
+	help
+	  If you say Y here you will get access to the real time clock
+	  built into your AE3XX.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called rtc-atcrtc100.
+
 config RTC_DRV_EP93XX
 	tristate "Cirrus Logic EP93XX"
 	depends on ARCH_EP93XX || COMPILE_TEST

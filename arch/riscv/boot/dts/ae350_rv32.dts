@@ -102,7 +102,13 @@
     no-loopback-test = <1>;
     interrupt-parent = <&plic0>;
   };
-
+  rtc0: rtc@f0600000 {
+    compatible = "andestech,atcrtc100";
+    reg = <0xf0600000 0x1000>;
+    interrupts = <1 4>, <2 4>;
+    interrupt-parent = <&plic0>;
+    wakeup-source;
+  };
   mac0: mac@e0100000 {
     compatible = "andestech,atmac100";
     reg = <0xe0100000 0x1000>;
