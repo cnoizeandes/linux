@@ -71,6 +71,7 @@ SECTIONS
 		*(.sdata*)
 		/* End of data section */
 		_edata = .;
+		*(.sbss*)
 	}
 
 	BSS_SECTION(0x10, 0, 0)
