@@ -1516,7 +1516,6 @@ static int ftsdc_suspend(struct platform_device *pdev, pm_message_t state)
 	int ret = 0;
 	if (mmc) {
 		ftsdc_free_dma(host);
-		ret = mmc_suspend_host(mmc);
 	}
 	return ret;
 
@@ -1531,7 +1530,6 @@ static int ftsdc_resume(struct platform_device *pdev)
 #if (defined(CONFIG_PLATFORM_AHBDMA) || defined(CONFIG_PLATFORM_APBDMA))
 		ftsdc_alloc_dma(host);
 #endif
-		ret = mmc_resume_host(mmc);
 	}
 	return ret;
 }
