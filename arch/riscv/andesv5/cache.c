@@ -42,8 +42,8 @@ void cpu_dcache_wb_range(unsigned long start, unsigned long end)
 {
 	int line_size = get_cache_line_size();
 	while (end > start) {
-		csr_write(ucctlbeginaddr, start);
-		csr_write(ucctlcommand, CCTL_L1D_VA_WB);
+		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
+		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_WB);
 		start += line_size;
        }
 }
@@ -52,8 +52,8 @@ void cpu_dcache_inval_range(unsigned long start, unsigned long end)
 {
 	int line_size = get_cache_line_size();
 	while (end > start) {
-		csr_write(ucctlbeginaddr, start);
-		csr_write(ucctlcommand, CCTL_L1D_VA_INVAL);
+		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
+		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_INVAL);
 		start += line_size;
 	}
 }

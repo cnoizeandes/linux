@@ -5,6 +5,7 @@
   #size-cells = <2>;
   compatible = "andestech,ax25";
   model = "andestech,ax25";
+  dma-coherent;
 
   aliases {
     uart0 = &serial0;

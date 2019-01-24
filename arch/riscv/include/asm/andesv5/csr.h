@@ -20,7 +20,11 @@
 #define MDCM_CFG_ULM_2BANK_MASK	(0x1  << MDCM_CFG_ULM_2BANK_OFFSET)
 #define MDCM_CFG_DLM_ECC_MASK	(0x3  << MDCM_CFG_DLM_ECC_OFFSET)
 
+#define CCTL_REG_UCCTLBEGINADDR_NUM    0x80b
+#define CCTL_REG_UCCTLCOMMAND_NUM      0x80c
 
+
+#define custom_csr_write(csr_num,val) csr_write(csr_num,val)
 /* ucctlcommand */
 /* D-cache operation */
 #define CCTL_L1D_VA_INVAL	0

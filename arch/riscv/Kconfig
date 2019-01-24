@@ -221,11 +221,6 @@ config FPU
 	  in the kernel.
 	  If you don't know what to do here, say Y.
 
-config NDS_V5
-	bool "Andes v5 support"
-	default n
-	select DMA_NONCOHERENT_OPS
-
 endmenu
 
 menu "Kernel type"
