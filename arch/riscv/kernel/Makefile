@@ -45,4 +45,6 @@ obj-$(CONFIG_DYNAMIC_FTRACE)	+= mcount-dyn.o
 
 obj-$(CONFIG_PERF_EVENTS)      += perf_event.o
 
+obj-$(CONFIG_PM)		+= pm.o sleep.o
+
 clean:

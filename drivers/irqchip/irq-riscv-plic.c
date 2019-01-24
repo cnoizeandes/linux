@@ -400,6 +400,59 @@ static const struct irq_domain_ops plic_irqdomain_ops = {
 	.xlate	= irq_domain_xlate_onecell,
 };
 
+u32 __iomem *plic_base;
+unsigned int *wake_mask;
+unsigned int *orig;
+
+static int plic_set_wake(struct irq_data *d, unsigned int on)
+{
+	struct plic_data *data = irq_data_get_irq_chip_data(d);
+	u32 bit[MAX_DEVICES / 32];
+	u32 offset = d->hwirq / 32;
+	int i;
+
+	plic_base = data->reg;
+	bit[offset] = 1 << (d->hwirq % 32);
+
+	if (on)
+		__assign_bit(d->hwirq, (unsigned long *)wake_mask, true);
+	else
+		__assign_bit(d->hwirq, (unsigned long *)wake_mask, false);
+
+	for(i = 0; i < data->handlers; ++i) {
+		if (data->handler[i].present) {
+			unsigned int int_mask[MAX_DEVICES / 32];
+			u32 __iomem *reg = plic_enable_vector(data,
+						data->handler[i].contextid)
+						+ offset;
+			u32 target_area = i * (MAX_DEVICES / 32);
+
+			int_mask[offset] = readl(reg);
+			if (on) {
+				if (int_mask[offset] & bit[offset])
+					__assign_bit(d->hwirq,
+						    (unsigned long *)&orig[target_area],
+						    true);
+				else
+					__assign_bit(d->hwirq,
+						    (unsigned long *)&orig[target_area],
+						    false);
+
+				__assign_bit(d->hwirq, (unsigned long *)int_mask, true);
+			} else {
+				if (!(orig[target_area] & bit[offset]))
+					__assign_bit(d->hwirq,
+						(unsigned long *)int_mask, false);
+
+				__assign_bit(d->hwirq, (unsigned long *)&orig[target_area],
+					    false);
+			}
+			writel(int_mask[offset], reg);
+		}
+	}
+	return 0;
+}
+
 static void plic_chained_handle_irq(struct irq_desc *desc)
 {
 	struct plic_handler *handler = irq_desc_get_handler_data(desc);
@@ -466,6 +519,14 @@ static int plic_init(struct device_node *node, struct device_node *parent)
 		goto free_handler;
 	}
 
+	wake_mask = kzalloc((MAX_DEVICES / 32) * sizeof(u32), GFP_KERNEL);
+	if (WARN_ON(!wake_mask))
+		return -ENOMEM;
+
+	orig = kzalloc(data->handlers * (MAX_DEVICES / 32) * sizeof(u32), GFP_KERNEL);
+	if (WARN_ON(!orig))
+		return -ENOMEM;
+
 	of_address_to_resource(node, 0, &resource);
 	snprintf(data->name, sizeof(data->name),
 		 "riscv,plic0,%llx", resource.start);
@@ -475,6 +536,7 @@ static int plic_init(struct device_node *node, struct device_node *parent)
 	data->chip.irq_enable = plic_irq_enable;
 	data->chip.irq_disable = plic_irq_disable;
 	data->chip.irq_eoi = plic_irq_eoi;
+	data->chip.irq_set_wake = plic_set_wake;
 
 	for (i = 0; i < data->handlers; ++i) {
 		struct plic_handler *handler = &data->handler[i];
@@ -522,6 +584,8 @@ free_reg:
 	iounmap(data->reg);
 free_data:
 	kfree(data);
+	kfree(wake_mask);
+	kfree(orig);
 	return out;
 }
 
