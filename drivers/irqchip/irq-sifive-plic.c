@@ -56,6 +56,8 @@
 #define     CONTEXT_CLAIM		0x04
 
 static void __iomem *plic_regs;
+unsigned int *wake_mask;
+unsigned int *orig;
 
 struct plic_handler {
 	bool			present;
@@ -111,6 +113,54 @@ static void plic_irq_mask(struct irq_data *d)
 	plic_irq_toggle(cpu_possible_mask, d->hwirq, 0);
 }
 
+static int plic_set_wake(struct irq_data *d, unsigned int on)
+{
+	struct plic_data *data = irq_data_get_irq_chip_data(d);
+	u32 bit[MAX_DEVICES / 32];
+	u32 offset = d->hwirq / 32;
+	int i;
+
+	bit[offset] = 1 << (d->hwirq % 32);
+
+	if (on)
+		__assign_bit(d->hwirq, (unsigned long *)wake_mask, true);
+	else
+		__assign_bit(d->hwirq, (unsigned long *)wake_mask, false);
+
+	for(i = 0; i < data->handlers; ++i) {
+		if (data->handler[i].present) {
+			unsigned int int_mask[MAX_DEVICES / 32];
+			u32 __iomem *reg = plic_enable_vector(data,
+			data->handler[i].contextid)
+			+ offset;
+			u32 target_area = i * (MAX_DEVICES / 32);
+
+			int_mask[offset] = readl(reg);
+			if (on) {
+				if (int_mask[offset] & bit[offset])
+					__assign_bit(d->hwirq,
+					(unsigned long *)&orig[target_area],
+					true);
+				else
+					__assign_bit(d->hwirq,
+					(unsigned long *)&orig[target_area],
+					false);
+
+				__assign_bit(d->hwirq, (unsigned long *)int_mask, true);
+			} else {
+				if (!(orig[target_area] & bit[offset]))
+					__assign_bit(d->hwirq,
+					(unsigned long *)int_mask, false);
+
+				__assign_bit(d->hwirq, (unsigned long *)&orig[target_area],
+				false);
+			}
+			writel(int_mask[offset], reg);
+		}
+	}
+	return 0;
+}
+
 #ifdef CONFIG_SMP
 static int plic_set_affinity(struct irq_data *d,
 			     const struct cpumask *mask_val, bool force)
@@ -146,6 +196,7 @@ static struct irq_chip plic_chip = {
 	.irq_mask	= plic_irq_mask,
 	.irq_unmask	= plic_irq_unmask,
 	.irq_eoi	= plic_irq_eoi,
+	.irq_set_wake = plic_set_wake,
 #ifdef CONFIG_SMP
 	.irq_set_affinity = plic_set_affinity,
 #endif
@@ -240,6 +291,14 @@ static int __init plic_init(struct device_node *node,
 	if (WARN_ON(!plic_irqdomain))
 		goto out_iounmap;
 
+	wake_mask = kzalloc((MAX_DEVICES / 32) * sizeof(u32), GFP_KERNEL);
+	if (WARN_ON(!wake_mask))
+		return -ENOMEM;
+
+	orig = kzalloc(data->handlers * (MAX_DEVICES / 32) * sizeof(u32), GFP_KERNEL);
+	if (WARN_ON(!orig))
+		return -ENOMEM;
+
 	for (i = 0; i < nr_contexts; i++) {
 		struct of_phandle_args parent;
 		struct plic_handler *handler;
@@ -302,6 +361,10 @@ done:
 
 out_iounmap:
 	iounmap(plic_regs);
+	if(wake_mask)
+		kfree(wake_mask);
+	if(kfree)
+		kfree(orig);
 	return error;
 }
 
