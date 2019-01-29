@@ -9,18 +9,19 @@
 
 extern unsigned int *wake_mask;
 extern void __iomem *plic_base;
-#define PLIC_PEND_BASE	0x1000
-#define MAX_DEVICES 1024
+#define PLIC_PEND_OFF	0x1000
+#define MAX_DEVICES	1024
+#define MAX_USE_REGS	MAX_DEVICES / 32
 
 static void riscv_suspend_cpu(void)
 {
 	int i;
 	unsigned int wake;
-	u32 __iomem *reg = plic_base + PLIC_PEND_BASE;
+	u32 __iomem *reg = plic_base + PLIC_PEND_OFF;
 
 	while (true) {
 		__asm__ volatile ("wfi\n\t");
-		for (i = 0; i < MAX_DEVICES / 32; i++) {
+		for (i = 0; i < MAX_USE_REGS; i++) {
 			if (wake_mask[i]) {
 				wake = readl(reg + i);
 				if (wake_mask[i] & wake) {
@@ -33,18 +34,7 @@ wakeup:
 	return;
 }
 
-extern void suspend2ram(void);
-static void riscv_suspend2ram(void)
-{
-	int i = smp_processor_id();
-
-	if (i != 0) {
-		pr_err ("it is not a boot cpu\n");
-		return ;
-	}
-
-	suspend2ram();
-}
+extern void riscv_suspend2ram(void);
 
 static int riscv_pm_enter(suspend_state_t state)
 {
