@@ -41,6 +41,7 @@
  * devices.
  */
 #define MAX_DEVICES	1024
+#define MAX_USE_REGS	(MAX_DEVICES / 32)
 #define MAX_CONTEXTS	15872
 
 /*
@@ -407,7 +408,7 @@ unsigned int *orig;
 static int plic_set_wake(struct irq_data *d, unsigned int on)
 {
 	struct plic_data *data = irq_data_get_irq_chip_data(d);
-	u32 bit[MAX_DEVICES / 32];
+	u32 bit[MAX_USE_REGS];
 	u32 offset = d->hwirq / 32;
 	int i;
 
@@ -421,11 +422,11 @@ static int plic_set_wake(struct irq_data *d, unsigned int on)
 
 	for(i = 0; i < data->handlers; ++i) {
 		if (data->handler[i].present) {
-			unsigned int int_mask[MAX_DEVICES / 32];
+			unsigned int int_mask[MAX_USE_REGS];
 			u32 __iomem *reg = plic_enable_vector(data,
 						data->handler[i].contextid)
 						+ offset;
-			u32 target_area = i * (MAX_DEVICES / 32);
+			u32 target_area = i * MAX_USE_REGS;
 
 			int_mask[offset] = readl(reg);
 			if (on) {
@@ -519,11 +520,11 @@ static int plic_init(struct device_node *node, struct device_node *parent)
 		goto free_handler;
 	}
 
-	wake_mask = kzalloc((MAX_DEVICES / 32) * sizeof(u32), GFP_KERNEL);
+	wake_mask = kzalloc(MAX_USE_REGS * sizeof(u32), GFP_KERNEL);
 	if (WARN_ON(!wake_mask))
 		return -ENOMEM;
 
-	orig = kzalloc(data->handlers * (MAX_DEVICES / 32) * sizeof(u32), GFP_KERNEL);
+	orig = kzalloc(data->handlers * MAX_USE_REGS * sizeof(u32), GFP_KERNEL);
 	if (WARN_ON(!orig))
 		return -ENOMEM;
 
