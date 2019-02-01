@@ -31,13 +31,23 @@
       riscv,priv-minor = <10>;
       mmu-type = "riscv,sv39";
       clock-frequency = <60000000>;
+      i-cache-size = <0x8000>;
+      i-cache-line-size = <32>;
       d-cache-size = <0x8000>;
       d-cache-line-size = <32>;
+      next-level-cache = <&L2>;
       CPU0_intc: interrupt-controller {
         #interrupt-cells = <1>;
         interrupt-controller;
         compatible = "riscv,cpu-intc";
       };
+    };
+
+    L2: l2-cache@e0500000 {
+      compatible = "cache";
+      cache-level = <2>;
+      cache-size = <0x40000>;
+      reg = <0x0 0xe0500000 0x0 0x40000>;
     };
   };
 
