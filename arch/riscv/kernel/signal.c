@@ -37,6 +37,35 @@ struct rt_sigframe {
 	struct ucontext uc;
 };
 
+#ifdef CONFIG_DSP
+static long restore_dsp_state(struct pt_regs *regs,
+			     struct __riscv_dsp_state *sc_dspregs)
+{
+	long err;
+
+	err = __copy_from_user(&current->thread.dspstate.ucode, &sc_dspregs->ucode, sizeof(unsigned long));
+	if (unlikely(err))
+		return err;
+	dspstate_restore(current);
+	return 0;
+}
+
+static long save_dsp_state(struct pt_regs *regs,
+			  struct __riscv_dsp_state *sc_dspregs)
+{
+	long err;
+
+	dspstate_save(current);
+	err = __copy_to_user(&sc_dspregs->ucode, &current->thread.dspstate.ucode, sizeof(unsigned long));
+	if (unlikely(err))
+		return err;
+	return 0;
+}
+#else
+#define save_dsp_state(task, regs) (0)
+#define restore_dsp_state(task, regs) (0)
+#endif
+
 #ifdef CONFIG_FPU
 static long restore_fp_state(struct pt_regs *regs,
 			     union __riscv_fp_state *sc_fpregs)
@@ -100,6 +129,8 @@ static long restore_sigcontext(struct pt_regs *regs,
 	/* Restore the floating-point state. */
 	if (has_fpu)
 		err |= restore_fp_state(regs, &sc->sc_fpregs);
+	if (has_dsp)
+		err |= restore_dsp_state(regs, &sc->sc_dspregs);
 	return err;
 }
 
@@ -153,6 +184,8 @@ static long setup_sigcontext(struct rt_sigframe __user *frame,
 	/* Save the floating-point state. */
 	if (has_fpu)
 		err |= save_fp_state(regs, &sc->sc_fpregs);
+	if (has_dsp)
+		err |= save_dsp_state(regs, &sc->sc_dspregs);
 	return err;
 }
 

@@ -101,6 +101,9 @@ void flush_thread(void)
 	 */
 	memset(&current->thread.fstate, 0, sizeof(current->thread.fstate));
 #endif
+#ifdef CONFIG_DSP
+	memset(&current->thread.dspstate, 0, sizeof(current->thread.dspstate));
+#endif
 }
 
 int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
