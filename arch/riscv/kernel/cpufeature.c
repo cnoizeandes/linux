@@ -28,9 +28,6 @@ EXPORT_SYMBOL(elf_platform);
 #ifdef CONFIG_FPU
 bool has_fpu __read_mostly;
 #endif
-#ifdef CONFIG_DSP
-bool has_dsp __read_mostly;
-#endif
 
 void riscv_fill_hwcap(void)
 {
@@ -68,9 +65,5 @@ void riscv_fill_hwcap(void)
 #ifdef CONFIG_FPU
        if (strstr(elf_platform, "f2p0") && strstr(elf_platform, "d2p0"))
                has_fpu = true;
-#endif
-#ifdef CONFIG_DSP
-       if (strstr(elf_platform, "xdsp"))
-               has_dsp = true;
 #endif
 }
