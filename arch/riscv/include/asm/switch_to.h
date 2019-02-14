@@ -82,8 +82,10 @@ static inline void __switch_to_aux(struct task_struct *prev,
 	fstate_restore(next, task_pt_regs(next));
 #endif
 #ifdef CONFIG_DSP
-	dspstate_save(prev);
-	dspstate_restore(next);
+	if (likely(has_dsp)) {
+		dspstate_save(prev);
+		dspstate_restore(next);
+	}
 #endif
 }
 
