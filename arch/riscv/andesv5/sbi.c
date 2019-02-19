@@ -28,6 +28,20 @@ void sbi_restart(int cpu_num)
 }
 EXPORT_SYMBOL(sbi_restart);
 
+void sbi_write_powerbrake(int val)
+{
+  sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_WRITE_POWERBRAKE, val, 0, 0, 0, 0, 0);
+}
+EXPORT_SYMBOL(sbi_write_powerbrake);
+
+int sbi_read_powerbrake(void)
+{
+  struct sbiret ret;
+  ret = sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_READ_POWERBRAKE, 0, 0, 0, 0, 0, 0);
+  return ret.value;
+}
+EXPORT_SYMBOL(sbi_read_powerbrake);
+
 void sbi_set_suspend_mode(int suspend_mode)
 {
 	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_SUSPEND_MODE, suspend_mode, 0, 0, 0, 0, 0);

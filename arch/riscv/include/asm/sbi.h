@@ -182,6 +182,8 @@ void sbi_set_reset_vec(int val);
 void sbi_set_pma(phys_addr_t offset, unsigned long vaddr, size_t size);
 void sbi_free_pma(unsigned long vaddr);
 long sbi_probe_pma(void);
+void sbi_write_powerbrake(int val);
+int sbi_read_powerbrake(void);
 
 #else /* CONFIG_RISCV_SBI */
 /* stubs for code that is only reachable under IS_ENABLED(CONFIG_RISCV_SBI): */
