@@ -26,6 +26,9 @@
 #define SBI_REMOTE_SFENCE_VMA_ASID 7
 #define SBI_SHUTDOWN 8
 #define SBI_TRIGGER 9
+// save 10 for performance counter
+#define SBI_READ_POWERBRAKE 11
+#define SBI_WRITE_POWERBRAKE 12
 
 #define SBI_CALL(which, arg0, arg1, arg2) ({			\
 	register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);	\
@@ -44,6 +47,16 @@
 #define SBI_CALL_1(which, arg0) SBI_CALL(which, arg0, 0, 0)
 #define SBI_CALL_2(which, arg0, arg1) SBI_CALL(which, arg0, arg1, 0)
 #define SBI_CALL_3(which, arg0, arg1, arg2) SBI_CALL(which, arg0, arg1, arg2)
+
+static inline void sbi_write_powerbrake(int val)
+{
+	SBI_CALL_1(SBI_WRITE_POWERBRAKE, val);
+}
+
+static inline int sbi_read_powerbrake(void)
+{
+	return SBI_CALL_0(SBI_READ_POWERBRAKE);
+}
 
 static inline void sbi_set_trigger(unsigned int type, uintptr_t data, int enable)
 {
