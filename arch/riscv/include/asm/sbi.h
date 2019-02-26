@@ -26,7 +26,7 @@
 #define SBI_REMOTE_SFENCE_VMA_ASID 7
 #define SBI_SHUTDOWN 8
 #define SBI_TRIGGER 9
-// save 10 for performance counter
+#define SBI_SET_PFM 10
 #define SBI_READ_POWERBRAKE 11
 #define SBI_WRITE_POWERBRAKE 12
 

@@ -29,6 +29,7 @@
 #define INTERRUPT_CAUSE_SOFTWARE    1
 #define INTERRUPT_CAUSE_TIMER       5
 #define INTERRUPT_CAUSE_EXTERNAL    9
+#define INTERRUPT_CAUSE_PMU        274
 
 void riscv_timer_interrupt(void);
 

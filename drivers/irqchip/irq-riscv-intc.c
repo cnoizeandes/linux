@@ -23,6 +23,7 @@
 #include <asm/ptrace.h>
 #include <asm/sbi.h>
 #include <asm/smp.h>
+#include <asm/perf_event.h>
 
 #define PTR_BITS (8 * sizeof(uintptr_t))
 
@@ -80,6 +81,9 @@ void riscv_intc_irq(struct pt_regs *regs)
 		break;
 	case INTERRUPT_CAUSE_SOFTWARE:
 		riscv_software_interrupt();
+		break;
+	case INTERRUPT_CAUSE_PMU:
+		riscv_perf_interrupt(regs);
 		break;
 	default:
 		domain = per_cpu(riscv_irq_data, smp_processor_id()).domain;
