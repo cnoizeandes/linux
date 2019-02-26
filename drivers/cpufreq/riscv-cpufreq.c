@@ -6,14 +6,18 @@
 
 #include <asm/sbi.h>
 
+void read_powerbrake(void *arg)
+{
+	int *ret = arg;
+
+	*ret = sbi_read_powerbrake();
+}
+
 static unsigned int riscv_cpufreq_get(unsigned int cpu)
 {
 	int val;
 
-	if (cpu)
-		return 0;
-
-	val = sbi_read_powerbrake();
+	smp_call_function_single(cpu, read_powerbrake, &val, 1);
 	val = val & 0xf0;
 	val = val >> 4;
 
