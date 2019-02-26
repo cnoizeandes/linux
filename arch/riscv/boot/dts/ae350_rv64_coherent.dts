@@ -167,6 +167,10 @@
     interrupt-parent = <&plic0>;
   };
 
+  pmu {
+    compatible = "riscv,base-pmu";
+  };
+
   virtio_mmio@fe007000 {
     interrupts = <0x17 0x4>;
     interrupt-parent = <0x2>;

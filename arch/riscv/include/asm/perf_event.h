@@ -11,14 +11,19 @@
 #include <linux/perf_event.h>
 #include <linux/ptrace.h>
 #include <linux/irqreturn.h>
-#define RISCV_BASE_COUNTERS	2
+
+/*
+ * We only have 2 counters,
+ * but there is a *time* register at counteren[1]
+ */
+#define RISCV_BASE_COUNTERS	3
 
 /*
  * The RISCV_MAX_COUNTERS parameter should be specified.
  */
 
 #ifdef CONFIG_RISCV_BASE_PMU
-#define RISCV_MAX_COUNTERS	2
+#define RISCV_MAX_COUNTERS	7
 #endif
 
 #ifndef RISCV_MAX_COUNTERS
@@ -35,22 +40,82 @@
  * mhpmcounter31, but many high-end processors has at most 6 general
  * PMCs, we give the definition to MHPMCOUNTER8 here.
  */
-#define RISCV_PMU_CYCLE		0
-#define RISCV_PMU_INSTRET	1
-#define RISCV_PMU_MHPMCOUNTER3	2
-#define RISCV_PMU_MHPMCOUNTER4	3
-#define RISCV_PMU_MHPMCOUNTER5	4
-#define RISCV_PMU_MHPMCOUNTER6	5
-#define RISCV_PMU_MHPMCOUNTER7	6
-#define RISCV_PMU_MHPMCOUNTER8	7
+#define RISCV_CYCLE_COUNTER	0
+#define RISCV_INSTRET_COUNTER	2
+#define RISCV_PMU_MHPMCOUNTER3	3
+#define RISCV_PMU_MHPMCOUNTER4	4
+#define RISCV_PMU_MHPMCOUNTER5	5
+#define RISCV_PMU_MHPMCOUNTER6	6
+#define RISCV_PMU_MHPMCOUNTER7	7
+#define RISCV_PMU_MHPMCOUNTER8	8
 
 #define RISCV_OP_UNSUPP		(-EOPNOTSUPP)
+
+/* Event code for instruction commit events */
+#define RISCV_CYCLE_COUNT               0x10
+#define RISCV_INSTRET                   0x20
+#define INT_LOAD_INST                   0x30
+#define INT_STORE_INST                  0x40
+#define ATOMIC_MEM_OP                   0x50
+#define SYS_INST                        0x60
+#define INT_COMPUTE_INST                0x70
+#define CONDITION_BR                    0x80
+#define TAKEN_CONDITION_BR              0x90
+#define JAL_INST                        0xA0
+#define JALR_INST                       0xB0
+#define RET_INST                        0xC0
+#define CONTROL_TRANS_INST              0xD0
+#define EX9_INST                        0xE0
+#define INT_MUL_INST                    0xF0
+#define INT_DIV_REMAINDER_INST          0x100
+#define FLOAT_LOAD_INST                 0x110
+#define FLOAT_STORE_INST                0x120
+#define FLOAT_ADD_SUB_INST              0x130
+#define FLOAT_MUL_INST                  0x140
+#define FLOAT_FUSED_MULADD_INST         0x150
+#define FLOAT_DIV_SQUARE_ROOT_INST      0x160
+#define OTHER_FLOAT_INST                0x170
+
+/* Event code for memory system events */
+#define ILM_ACCESS                      0x01
+#define DLM_ACCESS                      0x11
+#define ICACHE_ACCESS                   0x21
+#define ICACHE_MISS                     0x31
+#define DCACHE_ACCESS                   0x41
+#define DCACHE_MISS                     0x51
+#define DCACHE_LOAD_ACCESS              0x61
+#define DCACHE_LOAD_MISS                0x71
+#define DCACHE_STORE_ACCESS             0x81
+#define DCACHE_STORE_MISS               0x91
+#define DCACHE_WB                       0xA1
+#define CYCLE_WAIT_ICACHE_FILL          0xB1
+#define CYCLE_WAIT_DCACHE_FILL          0xC1
+#define UNCACHED_IFETCH_FROM_BUS        0xD1
+#define UNCACHED_LOAD_FROM_BUS          0xE1
+#define CYCLE_WAIT_UNCACHED_IFETCH      0xF1
+#define CYCLE_WAIT_UNCACHED_LOAD        0x101
+#define MAIN_ITLB_ACCESS                0x111
+#define MAIN_ITLB_MISS                  0x121
+#define MAIN_DTLB_ACCESS                0x131
+#define MAIN_DTLB_MISS                  0x141
+#define CYCLE_WAIT_ITLB_FILL            0x151
+#define PIPE_STALL_CYCLE_DTLB_MISS      0x161
+
+/* Event code for microarchitecture events */
+#define MISPREDICT_CONDITION_BR         0x02
+#define MISPREDICT_TAKE_CONDITION_BR    0x12
+#define MISPREDICT_TARGET_RET_INST      0x22
+/* LAS: load after store, SAS: store after store */
+#define REPLAY_LAS_SAS                  0x32
 
 struct cpu_hw_events {
 	/* # currently enabled events*/
 	int			n_events;
 	/* currently enabled events */
 	struct perf_event	*events[RISCV_MAX_COUNTERS];
+
+	unsigned long           active_mask[BITS_TO_LONGS(RISCV_MAX_COUNTERS)];
+	unsigned long           used_mask[BITS_TO_LONGS(RISCV_MAX_COUNTERS)];
 	/* vendor-defined PMU data */
 	void			*platform;
 };
@@ -66,6 +131,7 @@ struct riscv_pmu {
 	/* method used to map hw/cache events */
 	int		(*map_hw_event)(u64 config);
 	int		(*map_cache_event)(u64 config);
+	int             (*map_raw_event)(u64 config);
 
 	/* max generic hw events in map */
 	int		max_events;
@@ -77,8 +143,10 @@ struct riscv_pmu {
 	/* vendor-defined PMU features */
 	void		*platform;
 
-	irqreturn_t	(*handle_irq)(int irq_num, void *dev);
+	void		(*handle_irq)(struct pt_regs *regs);
 	int		irq;
+	u64		max_period;
 };
 
+void riscv_perf_interrupt(struct pt_regs *regs);
 #endif /* _ASM_RISCV_PERF_EVENT_H */
