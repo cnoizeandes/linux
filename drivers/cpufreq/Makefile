@@ -101,7 +101,7 @@ obj-$(CONFIG_POWERNV_CPUFREQ)		+= powernv-cpufreq.o
 
 ##################################################################################
 # RISCV platform drivers
-obj-$(CONFIG_RISCV_CPUFREQ)            += riscv-cpufreq.o
+obj-$(CONFIG_ATCCPUFREQ)            += riscv-cpufreq.o
 
 ##################################################################################
 # Other platform drivers

@@ -52,14 +52,13 @@ config RISCV
 config CPU_FREQ
 	def_bool y
 
-config RISCV_CPUFREQ
-	def_bool y
-
 config CPU_FREQ_GOV_POWERSAVE
 	def_bool y
+	depends on CPU_FREQ
 
 config CPU_FREQ_DEFAULT_GOV_POWERSAVE
 	def_bool y
+	depends on CPU_FREQ
 
 config MMU
 	def_bool y
