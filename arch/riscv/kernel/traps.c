@@ -130,6 +130,17 @@ DO_ERROR_INFO(do_trap_ecall_s,
 DO_ERROR_INFO(do_trap_ecall_m,
 	SIGILL, ILL_ILLTRP, "environment call from M-mode");
 
+#ifdef CONFIG_GENERIC_BUG
+static inline unsigned long get_break_insn_length(unsigned long pc)
+{
+	bug_insn_t insn;
+
+	if (probe_kernel_address((bug_insn_t *)pc, insn))
+		return 0;
+	return (((insn & __INSN_LENGTH_MASK) == __INSN_LENGTH_32) ? 4UL : 2UL);
+}
+#endif /* CONFIG_GENERIC_BUG */
+
 asmlinkage void do_trap_break(struct pt_regs *regs)
 {
 #ifdef CONFIG_GENERIC_BUG
@@ -139,12 +150,10 @@ asmlinkage void do_trap_break(struct pt_regs *regs)
 		type = report_bug(regs->sepc, regs);
 		switch (type) {
 		case BUG_TRAP_TYPE_NONE:
-			do_trap_siginfo(SIGTRAP, TRAP_BRKPT, regs->sepc, current);
-			regs->sepc += 0x4;
-			return;
+			break;
 		case BUG_TRAP_TYPE_WARN:
-			regs->sepc += sizeof(bug_insn_t);
-			return;
+			regs->sepc += get_break_insn_length(regs->sepc);
+			break;
 		case BUG_TRAP_TYPE_BUG:
 			die(regs, "Kernel BUG");
 		}
@@ -163,7 +172,10 @@ int is_valid_bugaddr(unsigned long pc)
 		return 0;
 	if (probe_kernel_address((bug_insn_t __user *)pc, insn))
 		return 0;
-	return (insn == __BUG_INSN);
+	if ((insn & __INSN_LENGTH_MASK) == __INSN_LENGTH_32)
+		return (insn == __BUG_INSN_32);
+	else
+		return ((insn & __COMPRESSED_INSN_MASK) == __BUG_INSN_16);
 }
 #endif /* CONFIG_GENERIC_BUG */
 
