@@ -3,8 +3,17 @@
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/timex.h>
+#include <linux/of_platform.h>
 
 #include <asm/sbi.h>
+
+#define LV_MASK	0xF0
+#define LV_OFF	4
+
+#define NUM_LV	16
+#define LOW_LV	15
+#define HIGH_LV	0
+#define PERIOD	(policy->cpuinfo.max_freq / NUM_LV)
 
 void read_powerbrake(void *arg)
 {
@@ -13,27 +22,23 @@ void read_powerbrake(void *arg)
 	*ret = sbi_read_powerbrake();
 }
 
-static unsigned int riscv_cpufreq_get(unsigned int cpu)
-{
-	int val;
-
-	smp_call_function_single(cpu, read_powerbrake, &val, 1);
-	val = val & 0xf0;
-	val = val >> 4;
-
-	if (val == 0)
-		return 60 * 1024;
-	else if (val == 15)
-		return 10 * 1024;
-
-	return (52 - val * 3 + 2) * 1024;
-}
-
 void write_powerbrake(void *arg)
 {
 	int *val = arg;
 
 	sbi_write_powerbrake(*val);
+}
+
+static unsigned int riscv_cpufreq_get(unsigned int cpu)
+{
+	int val, max;
+	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+
+	smp_call_function_single(cpu, read_powerbrake, &val, 1);
+	val = (val & LV_MASK) >> LV_OFF;
+
+	max = (LOW_LV - val + 1) * PERIOD;
+	return max;
 }
 
 static int riscv_cpufreq_set_policy(struct cpufreq_policy *policy)
@@ -44,35 +49,46 @@ static int riscv_cpufreq_set_policy(struct cpufreq_policy *policy)
 	if (!policy)
 		return -EINVAL;
 
+	if (policy->min == 0 && policy->max == 0) {
+		pr_err ("Cannot set zero freq\n");
+		return -EINVAL;
+	}
 	val = (policy->min + policy->max) / 2;
 	switch (policy->policy) {
 		case CPUFREQ_POLICY_POWERSAVE:
-			val = (val + policy->min) / 2 / 1024;
+			val = (val + policy->min) / 2;
 			break;
 		case CPUFREQ_POLICY_PERFORMANCE:
-			val = (val + policy->max) / 2 / 1024;
+			val = (val + policy->max) / 2;
 			break;
 		default:
 			pr_err ("Not Support this governor\n");
 			break;
 	}
 
-	if (val < 10)
-		val = 15;
-	else if (val > 51)
-		val = 0;
-	else {
-		// search for level
-		for (i = 1; i < 15 ; i++) {
-			if ((val >= 52 - i * 3) &&
-			     (val <= 52 - i * 3 + 2)) {
-				val = i;
-				break;
-			}
-		}
+	if (val < 0) {
+		pr_err ("The freq is valid\n");
+		return -EINVAL;
 	}
 
-	val = val << 4;
+	/*
+	 * Powerbrake register has 16 level,
+	 * so we divide the xxxkHZ into 16 parts.
+	 *
+	 * EX: 100MHZ->100*1000kHZ
+	 *	|    |    |........|
+	 * Mhz	0  6250 12500    16*6250
+	 */
+
+	// transfer MHZ to kHZ, and divided to 16 level
+	for (i = 1; i <= NUM_LV; i++) {
+		if (val <= i * PERIOD) {
+			val = LOW_LV - (i - 1);
+			break;
+		}
+	}
+	val = val << LV_OFF;
+
 	return smp_call_function_single(cpu, write_powerbrake, &val, 1);
 }
 
@@ -94,35 +110,41 @@ static void riscv_get_policy(struct cpufreq_policy *policy)
 {
 	int val;
 
-	val = sbi_read_powerbrake();
-	val = val & 0xf0;
-	val = val >> 4;
+	smp_call_function_single(policy->cpu, read_powerbrake, &val, 1);
+	val = (val & LV_MASK) >> LV_OFF;
+
 	/*
 	 * Powerbrake register has 16 level,
-	 * so we divide the 60Mhz into 16 parts.
-	 *	|    |  |........|  |    |
-	 * Mhz	0    10 13       49 52   60
+	 * so we divide the xxxkHZ into 16 parts.
+	 *
+	 * EX: 100MHZ->100*1000kHZ
+	 *	|    |    |........|
+	 * Mhz	0  6250 12500    16*6250
 	 */
-	if (val == 0) { // highest performance
-		policy->min = 52 * 1024;
-		policy->max = 60 * 1024;
-	} else if (val == 15) { // lowest performance
-		policy->min = 0;
-		policy->max = 10 * 1024;
-	} else {
-		policy->min = 52 - val * 3;
-		policy->max = 52 - val * 3 + 2;
-	}
-
+	policy->min = (LOW_LV - val) * PERIOD;
+	policy->max = (LOW_LV - val + 1) * PERIOD;
 	policy->policy = CPUFREQ_POLICY_POWERSAVE;
 }
 
 static int riscv_cpufreq_cpu_init(struct cpufreq_policy *policy)
 {
+	u32 max_freq;
+	struct device_node *cpu;
+
+	cpu = of_get_cpu_node(policy->cpu, NULL);
+
+        if (!cpu)
+                return -ENODEV;
+
+	pr_debug("init cpufreq on CPU %d\n", policy->cpu);
+	if (of_property_read_u32(cpu, "clock-frequency", &max_freq)) {
+		pr_err("%s missing clock-frequency\n", cpu->name);
+		return -EINVAL;
+	}
+        of_node_put(cpu);
 
 	policy->cpuinfo.min_freq = 0;
-	policy->cpuinfo.max_freq = 60*1024; /* 60Mhz=60*1024khz */
-
+	policy->cpuinfo.max_freq = max_freq / 1000; /* kHZ */
 	riscv_get_policy(policy);
 
 	return 0;
