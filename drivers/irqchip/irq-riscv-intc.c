@@ -23,7 +23,10 @@
 #include <asm/ptrace.h>
 #include <asm/sbi.h>
 #include <asm/smp.h>
+
+#ifdef CONFIG_PERF_EVENTS
 #include <asm/perf_event.h>
+#endif
 
 #define PTR_BITS (8 * sizeof(uintptr_t))
 
@@ -58,7 +61,6 @@ void riscv_intc_irq(struct pt_regs *regs)
 	struct pt_regs *old_regs = set_irq_regs(regs);
 	struct irq_domain *domain;
 	unsigned long cause = csr_read(scause);
-
 	/*
 	 * The high order bit of the trap cause register is always set for
 	 * interrupts, which allows us to differentiate them from exceptions
@@ -82,9 +84,11 @@ void riscv_intc_irq(struct pt_regs *regs)
 	case INTERRUPT_CAUSE_SOFTWARE:
 		riscv_software_interrupt();
 		break;
+#ifdef CONFIG_PERF_EVENTS
 	case INTERRUPT_CAUSE_PMU:
 		riscv_perf_interrupt(regs);
 		break;
+#endif
 	default:
 		domain = per_cpu(riscv_irq_data, smp_processor_id()).domain;
 		generic_handle_irq(irq_find_mapping(domain, cause));
