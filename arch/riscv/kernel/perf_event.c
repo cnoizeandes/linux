@@ -33,10 +33,28 @@
 #include <asm/perf_event.h>
 #include <asm/sbi.h>
 
+#define PFMOVF_MASK	0x40000
+#define EVSEL_MASK	0xf
+#define UMODE_MASK	0x4
+#define SMODE_MASK	0x2
+#define MMODE_MASK	0x1
+
+#define MHPEVENT_OFF	4
+#define EVSEL_OFF	3
+
+#define INST_COMMIT	0
+#define MEM_SYS		1
+#define MICROARCH	2
+
+#define INST_COMMIT_NUM	23
+#define MEM_SYS_NUM	22
+#define MICROARCH_NUM	3
+
 static const struct riscv_pmu *riscv_pmu __read_mostly;
 static DEFINE_PER_CPU(struct cpu_hw_events, cpu_hw_events);
 typedef void (*perf_irq_t)(struct pt_regs *);
 perf_irq_t perf_irq = NULL;
+static cpumask_t pmu_cpu;
 
 /*
  * Hardware & cache maps and their methods
@@ -144,20 +162,20 @@ static const int riscv_cache_event_map[PERF_COUNT_HW_CACHE_MAX]
 
 static int riscv_map_raw_event(u64 config)
 {
-        u32 val = config & 0xf;
-        u32 event = config >> 4;
+        u32 val = config & EVSEL_MASK;
+        u32 event = config >> MHPEVENT_OFF;
 
         switch (val) {
-                case 0:
-                        if (event > 23)
+                case INST_COMMIT:
+                        if (event > INST_COMMIT_NUM)
                                 return -EINVAL;
                         break;
-                case 1:
-                        if (event > 22)
+                case MEM_SYS:
+                        if (event > MEM_SYS_NUM)
                                 return -EINVAL;
                         break;
-                case 2:
-                        if (event > 3)
+                case MICROARCH:
+                        if (event > MICROARCH_NUM)
                                 return -EINVAL;
                         break;
                 default:
@@ -304,14 +322,14 @@ void riscv_pmu_disable_counter(int idx)
 {
         u32 val = 1UL << idx;
 
-        csr_set(scountermask_s, val);
+        csr_set(scountinhibit, val);
 }
 
 void riscv_pmu_enable_counter(int idx)
 {
         u32 val = 1UL << idx;
 
-        csr_clear(scountermask_s, val);
+        csr_clear(scountinhibit, val);
 }
 
 void riscv_pmu_disable_interrupt(int idx)
@@ -346,14 +364,13 @@ static inline void riscv_pmu_disable_event(struct perf_event *event)
 static inline void riscv_pmu_disable(void)
 {
         // Disable all counter
-        csr_set(scountermask_s, 0xfffffffd);
+        csr_set(scountinhibit, 0xfffffffd);
 }
 
 static inline void riscv_pmu_enable(struct perf_event *event)
 {
         // Enable all counter
-        if (!(event->hw.config & 0x2))
-                csr_clear(scountermask_s, 0xfffffffd);
+	csr_clear(scountinhibit, 0xfffffffd);
 }
 
 static int riscv_event_set_period(struct perf_event *event)
@@ -395,19 +412,19 @@ static inline void riscv_pmu_event_enable(struct perf_event *event)
         struct hw_perf_event *hwc = &event->hw;
         int idx = hwc->idx;
         u32 value = 1UL << idx;
-        u32 ev_config = hwc->config >> 3;
+        u32 ev_config = hwc->config >> EVSEL_OFF;
 
         if (WARN_ON_ONCE(idx == -1))
                 return;
 
-        if(hwc->config & 0x1)
-                csr_set(mcountermask_m, value);
-        if(hwc->config & 0x2)
+        if(hwc->config & MMODE_MASK)
+                csr_set(scountermask_m, value);
+        if(hwc->config & SMODE_MASK)
                 csr_set(scountermask_s, value);
-        if(hwc->config & 0x4)
+        if(hwc->config & UMODE_MASK)
                 csr_set(scountermask_u, value);
 
-        if (idx < 3)
+        if (idx < BASE_COUNTERS)
                 return;
 
         switch (idx) {
@@ -434,20 +451,20 @@ static inline int riscv_get_counter_idx(u64 config)
         struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
         int idx;
         int max_cnt = riscv_pmu->num_counters;
-        u64 val = config >> 3;
+        u64 val = config >> EVSEL_OFF;
 
         if (val == RISCV_CYCLE_COUNT) {
-                if (test_bit(0, cpuc->used_mask))
-                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt - 3, 3);
+                if (test_bit(RISCV_CYCLE_COUNTER, cpuc->used_mask))
+                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt - BASE_COUNTERS, BASE_COUNTERS);
                 else
                         idx = RISCV_CYCLE_COUNTER;
         } else if (val == RISCV_INSTRET) {
-                if (test_bit(2, cpuc->used_mask))
-                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt - 3, 3);
+                if (test_bit(RISCV_INSTRET_COUNTER, cpuc->used_mask))
+                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt - BASE_COUNTERS, BASE_COUNTERS);
                 else
                         idx = RISCV_INSTRET_COUNTER;
         } else
-                idx = find_next_zero_bit(cpuc->used_mask, max_cnt - 3, 3);
+                idx = find_next_zero_bit(cpuc->used_mask, max_cnt - BASE_COUNTERS, BASE_COUNTERS);
 
         return idx;
 }
@@ -479,8 +496,11 @@ static void riscv_pmu_stop(struct perf_event *event, int flags)
 	}
 
 	// disable all mask
-	csr_write(scountermask_s, 0);
-	csr_write(scountermask_u, 0);
+	if (cpuc->n_events == 0) {
+		csr_write(scountermask_m, 0);
+		csr_write(scountermask_s, 0);
+		csr_write(scountermask_u, 0);
+	}
 }
 
 /*
@@ -514,8 +534,7 @@ static void riscv_pmu_start(struct perf_event *event, int flags)
 
 	riscv_pmu_enable_interrupt(idx);
 	riscv_pmu_event_enable(event);
-	if (!(event->hw.config & 0x2))
-		riscv_pmu_enable_counter(idx);
+	riscv_pmu_enable_counter(idx);
 
 	perf_event_update_userpage(event);
 }
@@ -698,10 +717,10 @@ static int riscv_event_init(struct perf_event *event)
          */
 
         if (attr->exclude_user)
-                hwc->config |= 0x4;
+                hwc->config |= UMODE_MASK;
 
         if (attr->exclude_kernel)
-                hwc->config |= 0x2;
+                hwc->config |= SMODE_MASK;
 
 
         if (!hwc->sample_period) {
@@ -714,7 +733,7 @@ static int riscv_event_init(struct perf_event *event)
 	 * idx is set to -1 because the index of a general event should not be
 	 * decided until binding to some counter in pmu->add().
 	 */
-	hwc->config |= (code << 3);
+	hwc->config |= (code << EVSEL_OFF);
 	hwc->idx = -1;
 
 	return 0;
@@ -739,7 +758,7 @@ static ssize_t riscv_pmu_cpumask_show(struct device *dev,
                                       struct device_attribute *attr,
                                       char *buf)
 {
-        return 0;
+        return cpumap_print_to_pagebuf(true, buf, &pmu_cpu);
 }
 
 static DEVICE_ATTR(cpus, 0444, riscv_pmu_cpumask_show, NULL);
@@ -760,7 +779,11 @@ static const struct attribute_group *riscv_pmu_attr_groups[] = {
 };
 
 static struct pmu min_pmu = {
+#ifdef CONFIG_ANDES_PMU
+	.name		= "andes-base",
+#elif defined CONFIG_RISCV_BASE_PMU
 	.name		= "riscv-base",
+#endif
 	.attr_groups    = riscv_pmu_attr_groups,
 	.event_init	= riscv_event_init,
 	.add		= riscv_pmu_add,
@@ -783,7 +806,7 @@ static const struct riscv_pmu riscv_base_pmu = {
 #elif __riscv_xlen == 64
 	.counter_width = 63,
 #endif
-	.num_counters = RISCV_BASE_COUNTERS + 4,
+	.num_counters = RISCV_MAX_COUNTERS,
 	.handle_irq = &riscv_base_pmu_handle_irq,
 	.max_period = 0xFFFFFFFF,
 	/* This means this PMU has no IRQ. */
@@ -792,20 +815,33 @@ static const struct riscv_pmu riscv_base_pmu = {
 
 static const struct of_device_id riscv_pmu_of_ids[] = {
 	{.compatible = "riscv,base-pmu",	.data = &riscv_base_pmu},
+	{.compatible = "riscv,andes-pmu",	.data = &riscv_base_pmu},
 	{ /* sentinel value */ }
 };
+
+void init_cpu_pmu(void *arg)
+{
+	// enable S-mode local interrupt and M-mode interrupt
+	csr_write(slie, PFMOVF_MASK);
+	SBI_CALL_0(SBI_SET_PFM);
+}
 
 int __init init_hw_perf_events(void)
 {
 	struct device_node *node = of_find_node_by_type(NULL, "pmu");
 	const struct of_device_id *of_id;
-	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+	int cpu;
 
 	riscv_pmu = &riscv_base_pmu;
-
+	cpumask_setall(&pmu_cpu);
 	/* The second bit we don't use*/
-	__set_bit(1, cpuc->active_mask);
-	__set_bit(1, cpuc->used_mask);
+	for_each_cpu(cpu, &pmu_cpu) {
+		struct cpu_hw_events *cpuc = per_cpu_ptr(&cpu_hw_events, cpu);
+
+		__set_bit(1, cpuc->active_mask);
+		__set_bit(1, cpuc->used_mask);
+		smp_call_function_single(cpu, init_cpu_pmu, NULL, 1);
+	}
 
 	if (node) {
 		of_id = of_match_node(riscv_pmu_of_ids, node);
@@ -814,12 +850,11 @@ int __init init_hw_perf_events(void)
 			riscv_pmu = of_id->data;
 		of_node_put(node);
 	}
-
+#ifdef CONFIG_ANDES_PMU
+	perf_pmu_register(riscv_pmu->pmu, "andes-base", PERF_TYPE_RAW);
+#elif defined CONFIG_RISCV_BASE_PMU
 	perf_pmu_register(riscv_pmu->pmu, "riscv-base", PERF_TYPE_RAW);
-
-	// enable S-mode local interrupt and M-mode interrupt
-	csr_write(slie, 0x40000);
-	SBI_CALL_0(SBI_SET_PFM);
+#endif
 	return 0;
 }
 arch_initcall(init_hw_perf_events);
