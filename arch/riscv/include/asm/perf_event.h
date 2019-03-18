@@ -13,18 +13,16 @@
 #include <linux/irqreturn.h>
 
 /*
- * We only have 2 counters,
+ * There only have 2 base counters,
  * but there is a *time* register at counteren[1]
  */
-#define RISCV_BASE_COUNTERS	3
-
-/*
- * The RISCV_MAX_COUNTERS parameter should be specified.
- */
-
 #ifdef CONFIG_RISCV_BASE_PMU
-#define RISCV_MAX_COUNTERS	7
+#define RISCV_MAX_COUNTERS	3
+#elif defined CONFIG_ANDES_PMU
+#define RISCV_MAX_COUNTERS      7
 #endif
+
+#define BASE_COUNTERS	3
 
 #ifndef RISCV_MAX_COUNTERS
 #error "Please provide a valid RISCV_MAX_COUNTERS for the PMU."
