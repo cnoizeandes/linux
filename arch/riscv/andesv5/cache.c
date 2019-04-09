@@ -9,6 +9,7 @@
 #include <asm/andesv5/proc.h>
 #include <asm/andesv5/csr.h>
 
+#define MAX_CACHE_LINE_SIZE 256
 
 DEFINE_PER_CPU(struct andesv5_cache_info, cpu_cache_info) = {
 	.init_done = 0,
@@ -38,19 +39,17 @@ inline int get_cache_line_size(void)
 		fill_cpu_cache_info(cpu_ci);
 	return cpu_ci->dcache_line_size;
 }
-void cpu_dcache_wb_range(unsigned long start, unsigned long end)
+void cpu_dcache_wb_range(unsigned long start, unsigned long end, int line_size)
 {
-	int line_size = get_cache_line_size();
 	while (end > start) {
 		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
 		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_WB);
 		start += line_size;
-       }
+	}
 }
 
-void cpu_dcache_inval_range(unsigned long start, unsigned long end)
+void cpu_dcache_inval_range(unsigned long start, unsigned long end, int line_size)
 {
-	int line_size = get_cache_line_size();
 	while (end > start) {
 		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
 		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_INVAL);
@@ -60,9 +59,31 @@ void cpu_dcache_inval_range(unsigned long start, unsigned long end)
 void cpu_dma_inval_range(unsigned long start, unsigned long end)
 {
         unsigned long flags;
+        unsigned long line_size = get_cache_line_size();
+	unsigned long old_start = start;
+	unsigned long old_end = end;
+	char cache_buf[2][MAX_CACHE_LINE_SIZE]={0};
+
+	if (unlikely(start == end))
+		return;
+
+	start = start & (~(line_size - 1));
+	end = ((end + line_size - 1) & (~(line_size - 1)));
 
         local_irq_save(flags);
-        cpu_dcache_inval_range(start, end);
+	if (unlikely(start != old_start)) {
+		memcpy(&cache_buf[0][0], (void *)start, line_size);
+	}
+	if (unlikely(end != old_end)) {
+		memcpy(&cache_buf[1][0], (void *)(old_end & (~(line_size - 1))), line_size);
+	}
+	cpu_dcache_inval_range(start, end, line_size);
+	if (unlikely(start != old_start)) {
+		memcpy((void *)start, &cache_buf[0][0], (old_start & (line_size - 1)));
+	}
+	if (unlikely(end != old_end)) {
+		memcpy((void *)(old_end + 1), &cache_buf[1][(old_end & (line_size - 1)) + 1], end - old_end - 1);
+	}
         local_irq_restore(flags);
 
 }
@@ -70,10 +91,12 @@ EXPORT_SYMBOL(cpu_dma_inval_range);
 
 void cpu_dma_wb_range(unsigned long start, unsigned long end)
 {
-        unsigned long flags;
+	unsigned long flags;
+	unsigned long line_size = get_cache_line_size();
 
         local_irq_save(flags);
-        cpu_dcache_wb_range(start, end);
+	start = start & (~(line_size - 1));
+	cpu_dcache_wb_range(start, end, line_size);
         local_irq_restore(flags);
 }
 EXPORT_SYMBOL(cpu_dma_wb_range);
