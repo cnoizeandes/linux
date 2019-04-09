@@ -417,7 +417,14 @@ static void ftsdc_work(struct work_struct *work)
 
 	ftsdc_enable_irq(host, false);
 	if (host->dodma) {
+		struct mmc_request *mrq = host->mrq;
+		struct mmc_command *cmd = host->cmd_is_stop ? mrq->stop : mrq->cmd;
+		struct mmc_data *data = cmd->data;
+
 		do_dma_access(host);
+		if(data)
+			dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+					 (data->flags & MMC_DATA_WRITE) ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
 	} else {
 		if (host->buf_active == XFER_WRITE)
 			do_pio_write(host);
