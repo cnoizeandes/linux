@@ -721,7 +721,7 @@ static int riscv_event_init(struct perf_event *event)
                 hwc->config |= UMODE_MASK;
 
         if (attr->exclude_kernel)
-                hwc->config |= SMODE_MASK;
+                hwc->config |= (SMODE_MASK | MMODE_MASK);
 
 
         if (!hwc->sample_period) {
