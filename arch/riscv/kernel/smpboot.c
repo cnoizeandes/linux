@@ -128,7 +128,7 @@ void __cpu_die(unsigned int cpu)
  */
 void cpu_play_dead(void)
 {
-	int sipval, sieval, scauseval;
+	unsigned long sipval, sieval, scauseval;
 	int cpu = smp_processor_id();
 
 	idle_task_exit();
@@ -150,7 +150,7 @@ void cpu_play_dead(void)
 		scauseval = csr_read(scause);
 	/* only break if wfi returns for an enabled interrupt */
 	} while ((sipval & sieval) == 0 &&
-		 scauseval != INTERRUPT_CAUSE_SOFTWARE);
+		 (scauseval & INTERRUPT_CAUSE_SOFTWARE) == 0);
 
 	boot_sec_cpu();
 }
