@@ -154,7 +154,11 @@ static int atc_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	cnt |= (((time / 60) & MIN_MSK) << MIN_OFF);
 	time %= 60;
 	cnt |= ((time & SEC_MSK) << SEC_OFF);
+
+	spin_lock_irq(&rtc->lock);
 	RTC_CNT = cnt;
+	spin_unlock_irq(&rtc->lock);
+
 	/* synchronization progress of RTC register updates */
 	while ((RTC_STA & WD) != WD)
 		continue;
@@ -191,6 +195,8 @@ static int atc_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 	alm |= ((tm->tm_sec & SEC_MSK) << SEC_OFF);
 	alm |= ((tm->tm_min & MIN_MSK) << MIN_OFF);
 	alm |= ((tm->tm_hour & HOR_MSK) << HOR_OFF);
+
+	spin_lock_irq(&rtc->lock);
 	RTC_ALM = alm;
 
 	while ((RTC_STA & WD) != WD)
@@ -198,6 +204,8 @@ static int atc_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 
 	if (wkalrm->enabled)
 		RTC_CR |= ALARM_INT;
+	spin_unlock_irq(&rtc->lock);
+
 	return 0;
 }
 
@@ -216,7 +224,7 @@ static int atc_rtc_probe(struct platform_device *pdev)
 
 	spin_lock_init(&rtc->lock);
 
-	rtc->alarm_irq = platform_get_irq(pdev, 1);
+	rtc->alarm_irq = platform_get_irq(pdev, 2);
 	if (rtc->alarm_irq < 0)
 		goto err_exit;
 
