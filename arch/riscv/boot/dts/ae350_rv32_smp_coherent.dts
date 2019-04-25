@@ -80,7 +80,7 @@
   soc {
     #address-cells = <1>;
     #size-cells = <1>;
-    compatible = "andestech,riscv-ae350-soc";
+    compatible = "simple-bus";
     ranges;
 
     plic0: interrupt-controller@e4000000 {
