@@ -232,22 +232,52 @@ static inline u64 read_counter(int idx)
 
 	switch (idx) {
 	case RISCV_CYCLE_COUNTER:
-		val = csr_read(cycle);
+#if __riscv_xlen == 32
+                val |= csr_read(cycle);
+                val |= ((u64)csr_read(cycleh) << 32);
+#elif __riscv_xlen == 64
+                val = csr_read(cycle);
+#endif
 		break;
 	case RISCV_INSTRET_COUNTER:
-		val = csr_read(instret);
+#if __riscv_xlen == 32
+                val |= csr_read(instret);
+                val |= ((u64)csr_read(instreth) << 32);
+#elif __riscv_xlen == 64
+                val = csr_read(instret);
+#endif
 		break;
 	case RISCV_PMU_MHPMCOUNTER3:
-		val = csr_read(0xC03);
+#if __riscv_xlen == 32
+                val |= csr_read(0xC03);
+                val |= ((u64)csr_read(0xC83) << 32);
+#elif __riscv_xlen == 64
+                val = csr_read(0xC03);
+#endif
 		break;
 	case RISCV_PMU_MHPMCOUNTER4:
-		val = csr_read(0xC04);
+#if __riscv_xlen == 32
+                val |= csr_read(0xC04);
+                val |= ((u64)csr_read(0xC84) << 32);
+#elif __riscv_xlen == 64
+                val = csr_read(0xC04);
+#endif
 		break;
 	case RISCV_PMU_MHPMCOUNTER5:
-		val = csr_read(0xC05);
+#if __riscv_xlen == 32
+                val |= csr_read(0xC05);
+                val |= ((u64)csr_read(0xC85) << 32);
+#elif __riscv_xlen == 64
+                val = csr_read(0xC05);
+#endif
 		break;
 	case RISCV_PMU_MHPMCOUNTER6:
-		val = csr_read(0xC06);
+#if __riscv_xlen == 32
+                val |= csr_read(0xC06);
+                val |= ((u64)csr_read(0xC86) << 32);
+#elif __riscv_xlen == 64
+                val = csr_read(0xC06);
+#endif
 		break;
 	default:
 		WARN_ON_ONCE(idx < 0 ||	idx > RISCV_MAX_COUNTERS);
@@ -261,22 +291,52 @@ static inline void write_counter(int idx, u64 value)
 {
         switch (idx) {
         case RISCV_CYCLE_COUNTER:
+#if __riscv_xlen == 32
                 csr_write(cycle, value);
+                csr_write(cycleh, value >> 32);
+#elif __riscv_xlen == 64
+                csr_write(cycle, value);
+#endif
                 break;
         case RISCV_INSTRET_COUNTER:
+#if __riscv_xlen == 32
                 csr_write(instret, value);
+                csr_write(instreth, value >> 32);
+#elif __riscv_xlen == 64
+                csr_write(instret, value);
+#endif
                 break;
         case RISCV_PMU_MHPMCOUNTER3:
+#if __riscv_xlen == 32
                 csr_write(0xC03, value);
+                csr_write(0xC83, value >> 32);
+#elif __riscv_xlen == 64
+                csr_write(0xC03, value);
+#endif
                 break;
         case RISCV_PMU_MHPMCOUNTER4:
+#if __riscv_xlen == 32
                 csr_write(0xC04, value);
+                csr_write(0xC84, value >> 32);
+#elif __riscv_xlen == 64
+                csr_write(0xC04, value);
+#endif
                 break;
         case RISCV_PMU_MHPMCOUNTER5:
+#if __riscv_xlen == 32
                 csr_write(0xC05, value);
+                csr_write(0xC85, value >> 32);
+#elif __riscv_xlen == 64
+                csr_write(0xC05, value);
+#endif
                 break;
         case RISCV_PMU_MHPMCOUNTER6:
+#if __riscv_xlen == 32
                 csr_write(0xC06, value);
+                csr_write(0xC86, value >> 32);
+#elif __riscv_xlen == 64
+                csr_write(0xC06, value);
+#endif
                 break;
         default:
                 WARN_ON_ONCE(idx < 0 || idx > RISCV_MAX_COUNTERS);
@@ -721,7 +781,10 @@ static int riscv_event_init(struct perf_event *event)
                 hwc->config |= UMODE_MASK;
 
         if (attr->exclude_kernel)
-                hwc->config |= (SMODE_MASK | MMODE_MASK);
+                hwc->config |= SMODE_MASK;
+
+        if (attr->exclude_machine)
+                hwc->config |= MMODE_MASK;
 
 
         if (!hwc->sample_period) {
@@ -802,11 +865,7 @@ static const struct riscv_pmu riscv_base_pmu = {
 	.map_cache_event = riscv_map_cache_event,
 	.map_raw_event = riscv_map_raw_event,
 	.cache_events = &riscv_cache_event_map,
-#if __riscv_xlen == 32
-	.counter_width = 31,
-#elif __riscv_xlen == 64
 	.counter_width = 63,
-#endif
 	.num_counters = RISCV_MAX_COUNTERS,
 	.handle_irq = &riscv_base_pmu_handle_irq,
 	.max_period = 0xFFFFFFFF,
