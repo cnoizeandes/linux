@@ -23,6 +23,7 @@
 #include <asm/io.h>
 #include <asm/dmad.h>
 #include "ftsdc010.h"
+#include "../core/core.h"
 
 #define DRIVER_NAME "ftsdc010"
 #define REG_READ(addr) readl((host->base + addr))
@@ -987,6 +988,7 @@ static void ftsdc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	if ((ios->power_mode == MMC_POWER_ON) ||
 	    (ios->power_mode == MMC_POWER_UP)) {
+		mmc_delay(250);
 		dbg(host, dbg_debug, "running at %ukHz (requested: %ukHz).\n",
 			host->real_rate/1000, ios->clock/1000);
 	} else {
