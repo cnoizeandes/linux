@@ -5,6 +5,10 @@ void cpu_dma_inval_range(unsigned long start, unsigned long end);
 
 void cpu_dma_wb_range(unsigned long start, unsigned long end);
 
+void cpu_l2c_inval_range(unsigned long base, unsigned long pa);
+
+void cpu_l2c_wb_range(unsigned long base, unsigned long pa);
+
 extern phys_addr_t pa_msb;;
 
 #define dma_remap(pa, size) ioremap((pa|(pa_msb << PAGE_SHIFT)), size)
