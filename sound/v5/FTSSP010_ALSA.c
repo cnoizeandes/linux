@@ -114,8 +114,11 @@ int init_hw(unsigned int cardno,unsigned int ac97, struct i2c_client *client);
  */
 #define AC97_CODEC_FORMATS		(SNDRV_PCM_FMTBIT_S16_LE)
 #define AC97_CODEC_SAMPLE_RATES		(SNDRV_PCM_RATE_48000 | \
+					 SNDRV_PCM_RATE_44100 | \
+					 SNDRV_PCM_RATE_32000 | \
 					 SNDRV_PCM_RATE_16000 | \
 					 SNDRV_PCM_RATE_8000)
+
 #define AC97_CODEC_SAMPLE_RATE_MIN	(8000)
 #define AC97_CODEC_SAMPLE_RATE_MAX	(48000)
 
@@ -297,7 +300,9 @@ static int snd_ftssp_playback_copy(struct snd_pcm_substream *substream,
 
 		if (runtime->channels == 1) {
 			while (count--) {
-				dma_va[0] = (u32)(*usr_va++) << 4;
+				pcm_data=0;
+				get_user(pcm_data, usr_va++);
+				dma_va[0] = (pcm_data & 0xffff) << 4;
 				dma_va[1] = dma_va[2] = dma_va[3] =
 				dma_va[4] = dma_va[5] = dma_va[0];
 				//memcpy(&dma_va[1], &dma_va[0], 5 * 4 * 1);
@@ -305,8 +310,14 @@ static int snd_ftssp_playback_copy(struct snd_pcm_substream *substream,
 			}
 		} else {  // assume 2 channels
 			while (count--) {
-				dma_va[0] = (u32)(*usr_va++) << 4;
-				dma_va[1] = (u32)(*usr_va++) << 4;
+				pcm_data=0;
+				get_user(pcm_data, usr_va++);
+				dma_va[0] = (pcm_data & 0xffff) << 4;
+
+				pcm_data=0;
+				get_user(pcm_data, usr_va++);
+				dma_va[1] = (pcm_data & 0xffff) << 4;
+
 				dma_va[2] = dma_va[4] = dma_va[6] =
 				dma_va[8] = dma_va[10] = dma_va[0];
 				dma_va[3] = dma_va[5] = dma_va[7] =
@@ -333,15 +344,23 @@ static int snd_ftssp_playback_copy(struct snd_pcm_substream *substream,
 
 		if (runtime->channels == 1) {
 			while (count--) {
-				dma_va[0] = (u32)(*usr_va++) << 4;
+				pcm_data=0;
+				get_user(pcm_data, usr_va++);
+				dma_va[0] = (pcm_data & 0xffff) << 4;
 				dma_va[1] = dma_va[2] = dma_va[0];
 				//memcpy(&dma_va[1], &dma_va[0], 2 * 4 * 1);
 				dma_va += 3;
 			}
 		} else {  // assume 2 channels
 			while (count--) {
-				dma_va[0] = (u32)(*usr_va++) << 4;
-				dma_va[1] = (u32)(*usr_va++) << 4;
+				pcm_data=0;
+				get_user(pcm_data, usr_va++);
+				dma_va[0] = (pcm_data & 0xffff) << 4;
+
+				pcm_data=0;
+				get_user(pcm_data, usr_va++);
+				dma_va[1] = (pcm_data & 0xffff) << 4;
+
 				dma_va[2] = dma_va[4] = dma_va[0];
 				dma_va[3] = dma_va[5] = dma_va[1];
 				//memcpy(&dma_va[2], &dma_va[0], 2 * 4 * 2);
@@ -408,19 +427,20 @@ static int snd_ftssp_capture_copy(struct snd_pcm_substream *substream,
 
 		if (runtime->channels == 1) {
 			while (count--) {
-				*usr_va++ = (u16)(dma_va[0] >> 4);
+				put_user((u16)(dma_va[0] >> 4),usr_va++);
 				dma_va += 6;
 			}
 		} else {
 			while (count--) {
-				usr_va[0] = (u16)(dma_va[0] >> 4);
+				put_user((u16)(dma_va[0] >> 4),usr_va);
+				usr_va++;
+				put_user((u16)(dma_va[0] >> 4),usr_va);
 
 				/* [hw-limit] only slot-3 has valid data in
 				 *   recording mode -- check TAG_DATA_MONO
 				 *   defined in "FTSSP010_lib.c".  Mask out
 				 *   one channel to avoid hi-freq noise.
 				 */
-				usr_va[1] = usr_va[0];
 				usr_va += 2;
 				dma_va += 12;
 			}
@@ -441,19 +461,20 @@ static int snd_ftssp_capture_copy(struct snd_pcm_substream *substream,
 
 		if (runtime->channels == 1) {
 			while (count--) {
-				*usr_va++ = (u16)(dma_va[0] >> 4);
+				put_user((u16)(dma_va[0] >> 4),usr_va++);	
 				dma_va += 3;
 			}
 		} else {
 			while (count--) {
-				usr_va[0] = (u16)(dma_va[0] >> 4);
+				put_user((u16)(dma_va[0] >> 4),usr_va);	
+				usr_va++;
+				put_user((u16)(dma_va[0] >> 4),usr_va);	
 
 				/* [hw-limit] only slot-3 has valid data in
 				 *   recording mode -- check TAG_DATA_MONO
 				 *   defined in "FTSSP010_lib.c".  Mask out
 				 *   one channel to avoid hi-freq noise.
 				 */
-				usr_va[1] = usr_va[0];
 				usr_va += 2;
 				dma_va += 6;
 			}
@@ -475,18 +496,19 @@ static int snd_ftssp_capture_copy(struct snd_pcm_substream *substream,
 
 		if (runtime->channels == 1) {
 			while (count--) {
-				*usr_va++ = (u16)(*dma_va++ >> 4);
+				 put_user((u16)(dma_va[0] >> 4),usr_va++);	
 			}
 		} else {
 			while (count--) {
-				usr_va[0] = (u16)(dma_va[0] >> 4);
-
+				put_user((u16)(dma_va[0] >> 4),usr_va);
+				usr_va++;
+				put_user((u16)(dma_va[0] >> 4),usr_va);	
+		
 				/* [hw-limit] only slot-3 has valid data in
 				 *   recording mode -- check TAG_DATA_MONO
 				 *   defined in "FTSSP010_lib.c".  Mask out
 				 *   one channel to avoid hi-freq noise.
 				 */
-				usr_va[1] = usr_va[0];
 				usr_va += 2;
 				dma_va += 2;
 			}
@@ -815,7 +837,7 @@ static int snd_ftssp_pcm_prepare(struct snd_pcm_substream *substream)
 		ftssp010_substream->pmu_set_clocking(48000);
 		ftssp010_substream->hw_config(cardno,
 			runtime->channels > 1 ? 1 : 0, /* 1: stereo, 0: mono */
-			48000, ftssp010_substream->dma_width);
+			runtime->rate, ftssp010_substream->dma_width);
 	} else {
 		ftssp010_substream->pmu_set_clocking(runtime->rate);
 		ftssp010_substream->hw_config(cardno,
