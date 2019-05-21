@@ -190,7 +190,8 @@
   };
 
   pmu {
-    compatible = "riscv,base-pmu";
+    device_type = "pmu";
+    compatible = "riscv,andes-pmu";
   };
 
   virtio_mmio@fe007000 {
