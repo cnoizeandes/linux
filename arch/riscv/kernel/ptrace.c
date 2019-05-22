@@ -19,6 +19,7 @@
 #include <asm/syscall.h>
 #include <asm/thread_info.h>
 #include <asm/sbi.h>
+#include <asm/cacheflush.h>
 #include <linux/ptrace.h>
 #include <linux/elf.h>
 #include <linux/regset.h>
@@ -153,9 +154,25 @@ long arch_ptrace(struct task_struct *child, long request,
 	return ret;
 }
 
+#define CNOP		0x0001
+#define CNOP_SIZE	0x2
+extern void bypass_singlestep(void);
+static void modify_bypass_to_nop(void)
+{
+	unsigned int nop = CNOP;
+	probe_kernel_write(&bypass_singlestep, &nop, CNOP_SIZE);
+	smp_mb();
+	flush_icache_range(&bypass_singlestep, &bypass_singlestep + CNOP_SIZE);
+}
+
+static bool is_bypass_singlestep = true;
 void user_enable_single_step(struct task_struct *child)
 {
 	set_tsk_thread_flag(child, TIF_SINGLESTEP);
+	if (is_bypass_singlestep) {
+		modify_bypass_to_nop();
+		is_bypass_singlestep = false;
+	}
 }
 
 void user_disable_single_step(struct task_struct *child)
