@@ -284,7 +284,6 @@ static void do_pio_read(struct ftsdc_host *host)
 				while (fifo_words--)
 					*ptr++ = REG_READ(SDC_DATA_WINDOW_REG);
 				host->buf_ptr = ptr;
-				udelay(800);
 				if (fifo & 3) {
 					u32 n = fifo & 3;
 					u32 data = REG_READ(SDC_DATA_WINDOW_REG);
