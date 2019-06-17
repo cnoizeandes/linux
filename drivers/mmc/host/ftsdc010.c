@@ -931,7 +931,6 @@ static void ftsdc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	} else {
 		ftsdc_send_request(mmc);
 	}
-
 	dbg(host, dbg_debug, "send request \n");
 }
 
@@ -987,7 +986,6 @@ static void ftsdc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	if ((ios->power_mode == MMC_POWER_ON) ||
 	    (ios->power_mode == MMC_POWER_UP)) {
-		mmc_delay(250);
 		dbg(host, dbg_debug, "running at %ukHz (requested: %ukHz).\n",
 			host->real_rate/1000, ios->clock/1000);
 	} else {
@@ -1015,6 +1013,8 @@ static void ftsdc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	/*set rsp and data timeout */
 	con = -1;
 	REG_WRITE(con, SDC_DATA_TIMER_REG);
+	if (ios->power_mode == MMC_POWER_UP)
+		mmc_delay(250);
 }
 
 static int ftsdc_get_ro(struct mmc_host *mmc)
