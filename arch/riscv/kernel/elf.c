@@ -296,11 +296,11 @@ static bool riscv_base_isa_compatible(const char** elf_isa,
 
 	for (i = 0; i < RISCV_NUM_BASE_ISA; i++) {
 		size_t len = strlen(base_isas[i]);
-		if (elf_base < 0 && strncasecmp(*elf_isa, base_isas[i], len)) {
+		if (elf_base < 0 && !strncasecmp(*elf_isa, base_isas[i], len)) {
 			elf_base = i;
 			*elf_isa += len;
 		}
-		if (host_base < 0 && strncasecmp(*host_isa, base_isas[i], len)) {
+		if (host_base < 0 && !strncasecmp(*host_isa, base_isas[i], len)) {
 			host_base = i;
 			*host_isa += len;
 		}
