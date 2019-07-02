@@ -505,26 +505,25 @@ static inline void riscv_pmu_event_enable(struct perf_event *event)
                         break;
         }
 }
-
 static inline int riscv_get_counter_idx(u64 config)
 {
         struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
         int idx;
-        int max_cnt = riscv_pmu->num_counters;
+        int max_cnt = riscv_pmu->num_counters - 1;
         u64 val = config >> EVSEL_OFF;
 
         if (val == RISCV_CYCLE_COUNT) {
                 if (test_bit(RISCV_CYCLE_COUNTER, cpuc->used_mask))
-                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt - BASE_COUNTERS, BASE_COUNTERS);
+                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt, BASE_COUNTERS);
                 else
                         idx = RISCV_CYCLE_COUNTER;
         } else if (val == RISCV_INSTRET) {
                 if (test_bit(RISCV_INSTRET_COUNTER, cpuc->used_mask))
-                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt - BASE_COUNTERS, BASE_COUNTERS);
+                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt, BASE_COUNTERS);
                 else
                         idx = RISCV_INSTRET_COUNTER;
         } else
-                idx = find_next_zero_bit(cpuc->used_mask, max_cnt - BASE_COUNTERS, BASE_COUNTERS);
+                idx = find_next_zero_bit(cpuc->used_mask, max_cnt, BASE_COUNTERS);
 
         return idx;
 }
