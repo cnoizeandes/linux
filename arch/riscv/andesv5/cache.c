@@ -21,7 +21,6 @@
 #define SEL_PER_CTL	8
 #define SEL_OFF(id)	(8 * (id % 8))
 
-void __iomem *l2c_base;
 
 DEFINE_PER_CPU(struct andesv5_cache_info, cpu_cache_info) = {
 	.init_done = 0,
@@ -292,12 +291,68 @@ void cpu_dcache_disable(void *info)
 }
 
 /* L2 Cache */
-uint32_t cpu_l2c_ctl_status(void)
+int cpu_l2c_get_counter_idx(struct l2c_hw_events *l2c)
+{
+	int idx;
+
+	idx = find_next_zero_bit(l2c->used_mask, L2C_MAX_COUNTERS - 1, 0);
+	return idx;
+}
+
+uint32_t cpu_l2c_get_cctl_status(unsigned long base)
 {
 	return readl((void*)(l2c_base + L2C_REG_CTL_OFFSET));
 }
 
-void cpu_l2c_disable(void)
+void l2c_write_counter(int idx, u64 value, void __iomem *l2c_base)
+{
+	u32 vall = value;
+	u32 valh = value >> 32;
+
+	writel(vall, (void*)(l2c_base + L2C_REG_CN_HPM_OFFSET(idx)));
+	writel(valh, (void*)(l2c_base + L2C_REG_CN_HPM_OFFSET(idx) + 0x4));
+}
+
+u64 l2c_read_counter(int idx, void __iomem *l2c_base)
+{
+	u32 vall = readl((void*)(l2c_base + L2C_REG_CN_HPM_OFFSET(idx)));
+	u32 valh = readl((void*)(l2c_base + L2C_REG_CN_HPM_OFFSET(idx) + 0x4));
+	u64 val = ((u64)valh << 32) | vall;
+
+	return val;
+}
+
+void l2c_pmu_disable_counter(int idx, void __iomem *l2c_base)
+{
+	int n = idx / SEL_PER_CTL;
+	u32 vall = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
+	u32 valh = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
+	u64 val = ((u64)valh << 32) | vall;
+
+	val |= (EVSEL_MASK << SEL_OFF(idx));
+	vall = val;
+	valh = val >> 32;
+	writel(vall, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
+	writel(valh, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
+}
+
+#ifndef CONFIG_SMP
+void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base)
+{
+	int n = idx / SEL_PER_CTL;
+	u32 vall = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
+	u32 valh = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
+	u64 val = ((u64)valh << 32) | vall;
+
+	val = val & ~(EVSEL_MASK << SEL_OFF(idx));
+	val = val | (config << SEL_OFF(idx));
+	vall = val;
+	valh = val >> 32;
+	writel(vall, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
+	writel(valh, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
+}
+
+void cpu_l2c_inval_range(unsigned long base, unsigned long pa)
 {
 #ifdef CONFIG_SMP
 	int mhartid = get_cpu();
@@ -354,6 +409,7 @@ void cpu_l2c_inval_range(unsigned long pa, unsigned long size)
         align_start += line_size;
 	}
 }
+
 EXPORT_SYMBOL(cpu_l2c_inval_range);
 
 void cpu_l2c_wb_range(unsigned long pa, unsigned long size)
@@ -375,7 +431,26 @@ void cpu_l2c_wb_range(unsigned long pa, unsigned long size)
 }
 EXPORT_SYMBOL(cpu_l2c_wb_range);
 #else
-void cpu_l2c_inval_range(unsigned long pa, unsigned long size)
+void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base)
+{
+	int n = idx / SEL_PER_CTL;
+	int mhartid = smp_processor_id();
+	u32 vall = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
+	u32 valh = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
+	u64 val = ((u64)valh << 32) | vall;
+
+	if (config <= (CN_RECV_SNOOP_DATA(NR_CPUS - 1) & EVSEL_MASK))
+		config = config + mhartid * L2C_REG_PER_CORE_OFFSET;
+
+	val = val & ~(EVSEL_MASK << SEL_OFF(idx));
+	val = val | (config << SEL_OFF(idx));
+	vall = val;
+	valh = val >> 32;
+	writel(vall, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
+	writel(valh, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
+}
+
+void cpu_l2c_inval_range(unsigned long base, unsigned long pa)
 {
     int mhartid = get_cpu();
     unsigned long line_size = get_cache_line_size();
