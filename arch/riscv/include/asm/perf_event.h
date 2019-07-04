@@ -22,6 +22,7 @@
 #define RISCV_MAX_COUNTERS      7
 #endif
 
+#define L2C_MAX_COUNTERS	32
 #define BASE_COUNTERS	3
 
 #ifndef RISCV_MAX_COUNTERS
@@ -106,6 +107,38 @@
 /* LAS: load after store, SAS: store after store */
 #define REPLAY_LAS_SAS                  0x32
 
+/* Event code for L2c */
+#define L2C_CORE_OFF			0x10
+#define TOTAL_C0_ACCESS			0xff00
+#define L2C_C0_ACCESS			0xff01
+#define L2C_C0_MISS			0xff02
+#define TRANS_SNOOP_DATA		0xff03
+#define RECV_SNOOP_DATA			0xff04
+#define TOTAL_M4_ACCESS			0xff40
+#define L2C_M4_ACCESS			0xff41
+#define L2C_M4_MISS			0xff42
+#define M4_RECV_SNOOP			0xff44
+#define SYS_BUS_ACCESS			0xff50
+#define L2_WAY_0_EVICTION_COUNT		0xff70
+#define L2_WAY_1_EVICTION_COUNT		0xff71
+#define L2_WAY_2_EVICTION_COUNT		0xff72
+#define L2_WAY_3_EVICTION_COUNT		0xff73
+#define L2_WAY_4_EVICTION_COUNT		0xff74
+#define L2_WAY_5_EVICTION_COUNT		0xff75
+#define L2_WAY_6_EVICTION_COUNT		0xff76
+#define L2_WAY_7_EVICTION_COUNT		0xff77
+#define L2_WAY_8_EVICTION_COUNT		0xff78
+#define L2_WAY_9_EVICTION_COUNT		0xff79
+#define L2_WAY_10_EVICTION_COUNT	0xff7a
+#define L2_WAY_11_EVICTION_COUNT	0xff7b
+#define L2_WAY_12_EVICTION_COUNT	0xff7c
+#define L2_WAY_13_EVICTION_COUNT	0xff7d
+#define L2_WAY_14_EVICTION_COUNT	0xff7e
+#define L2_WAY_15_EVICTION_COUNT	0xff7f
+
+#define CN_RECV_SNOOP_DATA(x)	\
+	(RECV_SNOOP_DATA + (x * L2C_CORE_OFF))
+
 struct cpu_hw_events {
 	/* # currently enabled events*/
 	int			n_events;
@@ -116,6 +149,16 @@ struct cpu_hw_events {
 	unsigned long           used_mask[BITS_TO_LONGS(RISCV_MAX_COUNTERS)];
 	/* vendor-defined PMU data */
 	void			*platform;
+};
+
+struct l2c_hw_events {
+	int n_events;
+	struct perf_event	*events[32];
+
+	unsigned long		active_mask[BITS_TO_LONGS(32)];
+	unsigned long		used_mask[BITS_TO_LONGS(32)];
+
+	raw_spinlock_t          pmu_lock;
 };
 
 struct riscv_pmu {
@@ -147,4 +190,9 @@ struct riscv_pmu {
 };
 
 void riscv_perf_interrupt(struct pt_regs *regs);
+int cpu_l2c_get_counter_idx(struct l2c_hw_events *l2c);
+void l2c_write_counter(int idx, u64 value, void __iomem *l2c_base);
+u64 l2c_read_counter(int idx, void __iomem *l2c_base);
+void l2c_pmu_disable_counter(int idx, void __iomem *l2c_base);
+void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base);
 #endif /* _ASM_RISCV_PERF_EVENT_H */

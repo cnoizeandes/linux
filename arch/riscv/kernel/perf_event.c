@@ -31,10 +31,13 @@
 #include <linux/perf_event.h>
 #include <linux/atomic.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
 #include <asm/perf_event.h>
 #include <asm/sbi.h>
+#include <asm/andesv5/csr.h>
 
 #define PFMOVF_MASK	0x40000
+#define L2C_EVSEL_MASK	0xff
 #define EVSEL_MASK	0xf
 #define UMODE_MASK	0x4
 #define SMODE_MASK	0x2
@@ -42,6 +45,8 @@
 
 #define MHPEVENT_OFF	4
 #define EVSEL_OFF	3
+#define L2C_MARK_OFF	8
+#define L2C_FLAG_OFF	(L2C_MARK_OFF + EVSEL_OFF)
 
 #define INST_COMMIT	0
 #define MEM_SYS		1
@@ -56,7 +61,8 @@ static DEFINE_PER_CPU(struct cpu_hw_events, cpu_hw_events);
 typedef void (*perf_irq_t)(struct pt_regs *);
 perf_irq_t perf_irq = NULL;
 static cpumask_t pmu_cpu;
-
+static struct l2c_hw_events l2c_hw_events;
+static void __iomem *l2c_base;
 /*
  * Hardware & cache maps and their methods
  */
@@ -105,12 +111,12 @@ static const int riscv_cache_event_map[PERF_COUNT_HW_CACHE_MAX]
 	},
 	[C(LL)] = {
 		[C(OP_READ)] = {
-			[C(RESULT_ACCESS)] = RISCV_OP_UNSUPP,
-			[C(RESULT_MISS)] = RISCV_OP_UNSUPP,
+			[C(RESULT_ACCESS)] = L2C_C0_ACCESS,
+			[C(RESULT_MISS)] = L2C_C0_MISS,
 		},
 		[C(OP_WRITE)] = {
-			[C(RESULT_ACCESS)] = RISCV_OP_UNSUPP,
-			[C(RESULT_MISS)] = RISCV_OP_UNSUPP,
+			[C(RESULT_ACCESS)] = L2C_C0_ACCESS,
+			[C(RESULT_MISS)] = L2C_C0_MISS,
 		},
 		[C(OP_PREFETCH)] = {
 			[C(RESULT_ACCESS)] = RISCV_OP_UNSUPP,
@@ -159,12 +165,34 @@ static const int riscv_cache_event_map[PERF_COUNT_HW_CACHE_MAX]
 			[C(RESULT_MISS)] = RISCV_OP_UNSUPP,
 		},
 	},
+	[C(NODE)] = {
+		[C(OP_READ)] = {
+			[C(RESULT_ACCESS)] = RISCV_OP_UNSUPP,
+			[C(RESULT_MISS)] = RISCV_OP_UNSUPP,
+		},
+		[C(OP_WRITE)] = {
+			[C(RESULT_ACCESS)] = RISCV_OP_UNSUPP,
+			[C(RESULT_MISS)] = RISCV_OP_UNSUPP,
+		},
+		[C(OP_PREFETCH)] = {
+			[C(RESULT_ACCESS)] = RISCV_OP_UNSUPP,
+			[C(RESULT_MISS)] = RISCV_OP_UNSUPP,
+		},
+	},
 };
+
+static bool is_l2c_event(u64 config)
+{
+	return ((config >> L2C_FLAG_OFF) == L2C_EVSEL_MASK);
+}
 
 static int riscv_map_raw_event(u64 config)
 {
         u32 val = config & EVSEL_MASK;
         u32 event = config >> MHPEVENT_OFF;
+
+	if ((config >> L2C_MARK_OFF) == L2C_EVSEL_MASK)
+		return config;
 
         switch (val) {
                 case INST_COMMIT:
@@ -194,21 +222,17 @@ static int riscv_map_hw_event(u64 config)
 	return riscv_pmu->hw_events[config];
 }
 
-int riscv_map_cache_decode(u64 config, unsigned int *type,
-			   unsigned int *op, unsigned int *result)
-{
-	return -ENOENT;
-}
-
 static int riscv_map_cache_event(u64 config)
 {
 	unsigned int type, op, result;
-	int err = -ENOENT;
 	int code;
 
-	err = riscv_map_cache_decode(config, &type, &op, &result);
-	if (!riscv_pmu->cache_events || err)
-		return err;
+	type = (config >> 0) & 0xff;
+	op = (config >> 8) & 0xff;
+	result = (config >> 16) & 0xff;
+
+	if (!riscv_pmu->cache_events)
+		return -ENOENT;
 
 	if (type >= PERF_COUNT_HW_CACHE_MAX ||
 	    op >= PERF_COUNT_HW_CACHE_OP_MAX ||
@@ -217,7 +241,7 @@ static int riscv_map_cache_event(u64 config)
 
 	code = (*riscv_pmu->cache_events)[type][op][result];
 	if (code == RISCV_OP_UNSUPP)
-		return -EINVAL;
+		return -ENOENT;
 
 	return code;
 }
@@ -360,7 +384,10 @@ static void riscv_pmu_read(struct perf_event *event)
 
 	do {
 		prev_raw_count = local64_read(&hwc->prev_count);
-		new_raw_count = read_counter(idx);
+		if (is_l2c_event(hwc->config))
+			new_raw_count = l2c_read_counter(idx, l2c_base);
+		else
+			new_raw_count = read_counter(idx);
 
 		oldval = local64_cmpxchg(&hwc->prev_count, prev_raw_count,
 					 new_raw_count);
@@ -461,7 +488,10 @@ static int riscv_event_set_period(struct perf_event *event)
 
         local64_set(&hwc->prev_count, (u64)-left);
 
-        write_counter(idx, (u64)(-left));
+	if (is_l2c_event(hwc->config))
+		l2c_write_counter(idx, (u64)(-left), l2c_base);
+	else
+		write_counter(idx, (u64)(-left));
 
         perf_event_update_userpage(event);
 
@@ -515,16 +545,19 @@ static inline int riscv_get_counter_idx(u64 config)
 
         if (val == RISCV_CYCLE_COUNT) {
                 if (test_bit(RISCV_CYCLE_COUNTER, cpuc->used_mask))
-                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt, BASE_COUNTERS);
+                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt,
+						 BASE_COUNTERS);
                 else
                         idx = RISCV_CYCLE_COUNTER;
         } else if (val == RISCV_INSTRET) {
                 if (test_bit(RISCV_INSTRET_COUNTER, cpuc->used_mask))
-                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt, BASE_COUNTERS);
+                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt,
+						 BASE_COUNTERS);
                 else
                         idx = RISCV_INSTRET_COUNTER;
         } else
-                idx = find_next_zero_bit(cpuc->used_mask, max_cnt, BASE_COUNTERS);
+                idx = find_next_zero_bit(cpuc->used_mask, max_cnt,
+					 BASE_COUNTERS);
 
         return idx;
 }
@@ -542,7 +575,12 @@ static void riscv_pmu_stop(struct perf_event *event, int flags)
 {
 	struct hw_perf_event *hwc = &event->hw;
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+	struct l2c_hw_events *l2c = &l2c_hw_events;
 	int idx = hwc->idx;
+	unsigned long irq_flags;
+
+	if (is_l2c_event(hwc->config))
+		goto l2c_event_stop;
 
 	if (__test_and_clear_bit(idx, cpuc->active_mask)) {
 		riscv_pmu_disable_event(event);
@@ -561,6 +599,21 @@ static void riscv_pmu_stop(struct perf_event *event, int flags)
 		csr_write(scountermask_s, 0);
 		csr_write(scountermask_u, 0);
 	}
+	return;
+l2c_event_stop:
+	if (__test_and_clear_bit(idx, l2c->active_mask)) {
+		raw_spin_lock_irqsave(&l2c->pmu_lock, irq_flags);
+                l2c_pmu_disable_counter(hwc->idx, l2c_base);
+		raw_spin_unlock_irqrestore(&l2c->pmu_lock, irq_flags);
+
+                WARN_ON_ONCE(hwc->state & PERF_HES_STOPPED);
+                hwc->state |= PERF_HES_STOPPED;
+        }
+
+	if ((flags & PERF_EF_UPDATE) && !(hwc->state & PERF_HES_UPTODATE)) {
+		riscv_pmu->pmu->read(event);
+		hwc->state |= PERF_HES_UPTODATE;
+	}
 }
 
 /*
@@ -569,13 +622,18 @@ static void riscv_pmu_stop(struct perf_event *event, int flags)
 static void riscv_pmu_start(struct perf_event *event, int flags)
 {
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+	struct l2c_hw_events *l2c = &l2c_hw_events;
 	int idx = event->hw.idx;
+	unsigned long irq_flags;
 
 	if (WARN_ON_ONCE(!(event->hw.state & PERF_HES_STOPPED)))
 		return;
 
 	if (WARN_ON_ONCE(idx == -1))
 		return;
+
+	if (is_l2c_event(event->hw.config))
+		goto l2c_event_start;
 
 	riscv_pmu_disable_counter(idx);
 	if (flags & PERF_EF_RELOAD) {
@@ -595,7 +653,31 @@ static void riscv_pmu_start(struct perf_event *event, int flags)
 	riscv_pmu_enable_interrupt(idx);
 	riscv_pmu_event_enable(event);
 	riscv_pmu_enable_counter(idx);
+	goto finish_start;
+l2c_event_start:
+	raw_spin_lock_irqsave(&l2c->pmu_lock, irq_flags);
+	l2c_pmu_disable_counter(idx, l2c_base);
+	raw_spin_unlock_irqrestore(&l2c->pmu_lock, irq_flags);
 
+	if (flags & PERF_EF_RELOAD) {
+		WARN_ON_ONCE(!(event->hw.state & PERF_HES_UPTODATE));
+
+		/*
+		 * Set the counter to the period to the next interrupt here,
+		 * if you have any.
+		 */
+		riscv_event_set_period(event);
+	}
+	event->hw.state = 0;
+	l2c->events[idx] = event;
+
+	raw_spin_lock_irqsave(&l2c->pmu_lock, irq_flags);
+	__set_bit(idx, l2c->active_mask);
+
+	l2c_pmu_event_enable((event->hw.config >> EVSEL_OFF) & L2C_EVSEL_MASK,
+				idx, l2c_base);
+	raw_spin_unlock_irqrestore(&l2c->pmu_lock, irq_flags);
+finish_start:
 	perf_event_update_userpage(event);
 }
 
@@ -606,7 +688,12 @@ static int riscv_pmu_add(struct perf_event *event, int flags)
 {
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
 	struct hw_perf_event *hwc = &event->hw;
-	int idx;
+	struct l2c_hw_events *l2c = &l2c_hw_events;
+	int idx = 0;
+	unsigned long irq_flags;
+
+	if (is_l2c_event(hwc->config))
+		goto add_l2c_event;
 
 	if (cpuc->n_events == riscv_pmu->num_counters)
 		return -ENOSPC;
@@ -615,17 +702,34 @@ static int riscv_pmu_add(struct perf_event *event, int flags)
 	if (WARN_ON_ONCE(idx == riscv_pmu->num_counters))
 		return -ENOSPC;
 
-	hwc->idx = idx;
-	cpuc->events[hwc->idx] = event;
+	cpuc->events[idx] = event;
 	cpuc->n_events++;
+
 	__set_bit(idx, cpuc->used_mask);
 
+	goto finish_add;
+
+add_l2c_event:
+	if (l2c->n_events == L2C_MAX_COUNTERS)
+		return -ENOSPC;
+
+	raw_spin_lock_irqsave(&l2c->pmu_lock, irq_flags);
+	idx = cpu_l2c_get_counter_idx(l2c);
+	if (WARN_ON_ONCE(idx == L2C_MAX_COUNTERS))
+		return -ENOSPC;
+
+	l2c->events[idx] = event;
+	l2c->n_events++;
+
+	__set_bit(idx, l2c->used_mask);
+	raw_spin_unlock_irqrestore(&l2c->pmu_lock, irq_flags);
+finish_add:
+	hwc->idx = idx;
 	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
 
-	if (flags & PERF_EF_START)
-		riscv_pmu->pmu->start(event, PERF_EF_RELOAD);
-
-	return 0;
+        if (flags & PERF_EF_START)
+                riscv_pmu->pmu->start(event, PERF_EF_RELOAD);
+        return 0;
 }
 
 /*
@@ -634,11 +738,27 @@ static int riscv_pmu_add(struct perf_event *event, int flags)
 static void riscv_pmu_del(struct perf_event *event, int flags)
 {
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+	struct l2c_hw_events *l2c = &l2c_hw_events;
 	struct hw_perf_event *hwc = &event->hw;
+	unsigned long irq_flags;
+
+	if (is_l2c_event(hwc->config))
+		goto l2c_events_del;
 
 	cpuc->events[hwc->idx] = NULL;
 	cpuc->n_events--;
 	__clear_bit(hwc->idx, cpuc->used_mask);
+	goto finish_del;
+
+l2c_events_del:
+	l2c->events[hwc->idx] = NULL;
+
+	raw_spin_lock_irqsave(&l2c->pmu_lock, irq_flags);
+	l2c->n_events--;
+	raw_spin_unlock_irqrestore(&l2c->pmu_lock, irq_flags);
+
+	__clear_bit(hwc->idx, l2c->used_mask);
+finish_del:
 	riscv_pmu->pmu->stop(event, PERF_EF_UPDATE);
 	perf_event_update_userpage(event);
 }
@@ -891,6 +1011,8 @@ int __init init_hw_perf_events(void)
 	const struct of_device_id *of_id;
 	int cpu;
 
+	raw_spin_lock_init(&l2c_hw_events.pmu_lock);
+	l2c_hw_events.n_events = 0;
 	riscv_pmu = &riscv_base_pmu;
 	cpumask_setall(&pmu_cpu);
 	/* The second bit we don't use*/
@@ -913,6 +1035,9 @@ int __init init_hw_perf_events(void)
 #elif defined CONFIG_RISCV_BASE_PMU
 	perf_pmu_register(riscv_pmu->pmu, "riscv-base", PERF_TYPE_RAW);
 #endif
+	node = of_find_compatible_node(NULL, NULL, "cache");
+	l2c_base = of_iomap(node, 0);
+
 	return 0;
 }
 arch_initcall(init_hw_perf_events);
