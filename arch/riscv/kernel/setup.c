@@ -39,6 +39,7 @@
 #include <asm/tlbflush.h>
 #include <asm/thread_info.h>
 #include <asm/csr.h>
+#include <asm/kasan.h>
 
 #ifdef CONFIG_EARLY_PRINTK
 static void sbi_console_write(struct console *co, const char *buf,
@@ -155,6 +156,7 @@ asmlinkage void __init setup_vm(void)
 
 	for (i = 0; i < (-PAGE_OFFSET)/PGDIR_SIZE; ++i) {
 		size_t o = (PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD + i;
+
 		swapper_pg_dir[o] =
 			pfn_pgd(PFN_DOWN((uintptr_t)swapper_pmd) + i,
 				__pgprot(_PAGE_TABLE));
@@ -244,6 +246,11 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_SWIOTLB
 	swiotlb_init(1);
 #endif
+
+#ifdef CONFIG_KASAN
+	kasan_init();
+#endif
+
 #ifdef CONFIG_SMP
 	setup_smp();
 #endif

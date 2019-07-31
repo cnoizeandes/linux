@@ -3,7 +3,8 @@
 #include <linux/linkage.h>
 #include <asm/asm.h>
 
-ENTRY(memmove)
+ENTRY(__memmove)
+WEAK(memmove)
 	move	t0, a0
 	move	t1, a1
 

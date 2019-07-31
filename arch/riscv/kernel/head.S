@@ -70,6 +70,10 @@ clbss_l:
 	li a0, ASM_THREAD_SIZE
 	add sp, sp, a0
 
+#ifdef CONFIG_KASAN
+	call kasan_early_init
+#endif
+
 	/* Start the kernel */
 	mv a0, s0
 	mv a1, s1
