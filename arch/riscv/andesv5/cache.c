@@ -10,9 +10,7 @@
 #include <asm/io.h>
 #include <asm/andesv5/proc.h>
 #include <asm/andesv5/csr.h>
-#ifdef CONFIG_PERF_EVENT
 #include <asm/perf_event.h>
-#endif
 
 #define MAX_CACHE_LINE_SIZE 256
 #define EVSEL_MASK	0xff
@@ -110,59 +108,17 @@ void cpu_dma_wb_range(unsigned long start, unsigned long end)
 EXPORT_SYMBOL(cpu_dma_wb_range);
 
 /* L2 Cache */
-uint32_t cpu_l2c_get_cctl_status(unsigned long base)
-{
-	return readl((void*)(base + L2C_REG_STATUS_OFFSET));
-}
-
-#ifndef CONFIG_SMP
-void cpu_l2c_inval_range(unsigned long base, unsigned long pa)
-{
-	writel(pa, (void*)(base + L2C_REG_C0_ACC_OFFSET));
-	writel(CCTL_L2_PA_INVAL, (void*)(base + L2C_REG_C0_CMD_OFFSET));
-	while ((cpu_l2c_get_cctl_status(base) & CCTL_L2_STATUS_C0_MASK)
-	       != CCTL_L2_STATUS_IDLE);
-}
-
-EXPORT_SYMBOL(cpu_l2c_inval_range);
-
-void cpu_l2c_wb_range(unsigned long base, unsigned long pa)
-{
-	writel(pa, (void*)(base + L2C_REG_C0_ACC_OFFSET));
-	writel(CCTL_L2_PA_WB, (void*)(base + L2C_REG_C0_CMD_OFFSET));
-	while ((cpu_l2c_get_cctl_status(base) & CCTL_L2_STATUS_C0_MASK)
-	       != CCTL_L2_STATUS_IDLE);
-}
-EXPORT_SYMBOL(cpu_l2c_wb_range);
-#else
-void cpu_l2c_inval_range(unsigned long base, unsigned long pa)
-{
-	int mhartid = smp_processor_id();
-	writel(pa, (void*)(base + L2C_REG_CN_ACC_OFFSET(mhartid)));
-	writel(CCTL_L2_PA_INVAL, (void*)(base + L2C_REG_CN_CMD_OFFSET(mhartid)));
-	while ((cpu_l2c_get_cctl_status(base) & CCTL_L2_STATUS_CN_MASK(mhartid))
-	       != CCTL_L2_STATUS_IDLE);
-}
-EXPORT_SYMBOL(cpu_l2c_inval_range);
-
-void cpu_l2c_wb_range(unsigned long base, unsigned long pa)
-{
-	int mhartid = smp_processor_id();
-	writel(pa, (void*)(base + L2C_REG_CN_ACC_OFFSET(mhartid)));
-	writel(CCTL_L2_PA_WB, (void*)(base + L2C_REG_CN_CMD_OFFSET(mhartid)));
-	while ((cpu_l2c_get_cctl_status(base) & CCTL_L2_STATUS_CN_MASK(mhartid))
-	       != CCTL_L2_STATUS_IDLE);
-}
-EXPORT_SYMBOL(cpu_l2c_wb_range);
-#endif
-
-#ifdef CONFIG_PERF_EVENT
 int cpu_l2c_get_counter_idx(struct l2c_hw_events *l2c)
 {
 	int idx;
 
 	idx = find_next_zero_bit(l2c->used_mask, L2C_MAX_COUNTERS - 1, 0);
 	return idx;
+}
+
+uint32_t cpu_l2c_get_cctl_status(unsigned long base)
+{
+	return readl((void*)(base + L2C_REG_STATUS_OFFSET));
 }
 
 void l2c_write_counter(int idx, u64 value, void __iomem *l2c_base)
@@ -212,6 +168,25 @@ void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base)
 	writel(vall, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
 	writel(valh, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
 }
+
+void cpu_l2c_inval_range(unsigned long base, unsigned long pa)
+{
+	writel(pa, (void*)(base + L2C_REG_C0_ACC_OFFSET));
+	writel(CCTL_L2_PA_INVAL, (void*)(base + L2C_REG_C0_CMD_OFFSET));
+	while ((cpu_l2c_get_cctl_status(base) & CCTL_L2_STATUS_C0_MASK)
+	       != CCTL_L2_STATUS_IDLE);
+}
+
+EXPORT_SYMBOL(cpu_l2c_inval_range);
+
+void cpu_l2c_wb_range(unsigned long base, unsigned long pa)
+{
+	writel(pa, (void*)(base + L2C_REG_C0_ACC_OFFSET));
+	writel(CCTL_L2_PA_WB, (void*)(base + L2C_REG_C0_CMD_OFFSET));
+	while ((cpu_l2c_get_cctl_status(base) & CCTL_L2_STATUS_C0_MASK)
+	       != CCTL_L2_STATUS_IDLE);
+}
+EXPORT_SYMBOL(cpu_l2c_wb_range);
 #else
 void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base)
 {
@@ -231,5 +206,24 @@ void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base)
 	writel(vall, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
 	writel(valh, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
 }
-#endif
+
+void cpu_l2c_inval_range(unsigned long base, unsigned long pa)
+{
+	int mhartid = smp_processor_id();
+	writel(pa, (void*)(base + L2C_REG_CN_ACC_OFFSET(mhartid)));
+	writel(CCTL_L2_PA_INVAL, (void*)(base + L2C_REG_CN_CMD_OFFSET(mhartid)));
+	while ((cpu_l2c_get_cctl_status(base) & CCTL_L2_STATUS_CN_MASK(mhartid))
+	       != CCTL_L2_STATUS_IDLE);
+}
+EXPORT_SYMBOL(cpu_l2c_inval_range);
+
+void cpu_l2c_wb_range(unsigned long base, unsigned long pa)
+{
+	int mhartid = smp_processor_id();
+	writel(pa, (void*)(base + L2C_REG_CN_ACC_OFFSET(mhartid)));
+	writel(CCTL_L2_PA_WB, (void*)(base + L2C_REG_CN_CMD_OFFSET(mhartid)));
+	while ((cpu_l2c_get_cctl_status(base) & CCTL_L2_STATUS_CN_MASK(mhartid))
+	       != CCTL_L2_STATUS_IDLE);
+}
+EXPORT_SYMBOL(cpu_l2c_wb_range);
 #endif
