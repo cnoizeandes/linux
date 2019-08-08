@@ -22,6 +22,7 @@
 #include <linux/of.h>
 #include <linux/of_dma.h>
 #include <linux/math64.h>
+#include <asm/div64.h>
 
 resource_size_t	dmac_base;
 
@@ -1939,7 +1940,7 @@ int dmad_update_ring_sw_ptr(dmad_chreq * ch_req,
 	ring_p_idx = drq->sw_p_idx;
 	ring_p_off = drq->sw_p_off;
 
-	sw_p_idx = (int)(sw_ptr / period_size);
+	sw_p_idx = div_u64(sw_ptr, period_size);
 	__iter_div_u64_rem(sw_ptr, period_size, &sw_p_off);
 
 	if (remnant_size && (sw_p_idx == periods)) {
