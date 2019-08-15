@@ -1,4 +1,6 @@
 #include <linux/io.h>
+#include <asm/andesv5/proc.h>
+
 
 void *fmem_alloc(size_t size, dma_addr_t *dma_handle)
 {
@@ -11,8 +13,8 @@ void *fmem_alloc(size_t size, dma_addr_t *dma_handle)
 	}
 	*dma_handle = page_to_phys(page);
 
-	if ((cpu_addr = ioremap(*dma_handle, size))) {
 
+	if ((cpu_addr = dma_remap(*dma_handle, size))) {
 
 		do {
 			SetPageReserved(page);
@@ -91,7 +93,6 @@ static int __init faradayfb_map_video_memory(struct fb_info *info)
 		fbi->screen_dma = fbi->map_dma + PAGE_SIZE;
 		info->fix.smem_start = fbi->screen_dma;
 	}
-
 	return fbi->map_cpu ? 0 : -ENOMEM;
 }
 
