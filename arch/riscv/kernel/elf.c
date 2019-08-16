@@ -386,8 +386,6 @@ static int parse_riscv_attributes(const char* buf, const char* end)
 {
 	unsigned long tag;
 	const char* isa;
-	struct riscv_version priv = {.major = 0, .minor = 0};
-	int total_check = 0;
 
 	while (buf < end) {
 		/*
@@ -400,34 +398,21 @@ static int parse_riscv_attributes(const char* buf, const char* end)
 			case Tag_RISCV_arch:
 				/* For Tag_arch, parse the arch substring. */
 				isa = parse_ntbs(&buf, end);
-				if (!riscv_isa_compatible(isa))
-					return -ENOEXEC;
-				total_check++;
+				if (riscv_isa_compatible(isa))
+					return 0;
 				break;
 			case Tag_RISCV_stack_align:
 				parse_uleb128(&buf, end);
 				break;
-			case Tag_RISCV_priv_spec:
-				priv.major = parse_uleb128(&buf, end);
-				total_check++;
-				break;
-			case Tag_RISCV_priv_spec_minor:
-				priv.minor = parse_uleb128(&buf, end);
-				total_check++;
-				break;
 			/* Simply ignore other tags */
 			TAG_IGNORE_CASE(Tag_RISCV_priv_spec_revision)
+			TAG_IGNORE_CASE(Tag_RISCV_priv_spec)
+			TAG_IGNORE_CASE(Tag_RISCV_priv_spec_minor)
 			TAG_IGNORE_CASE(Tag_RISCV_unaligned_access)
 				continue;
 			default:
 				pr_warn("Unknown RISCV attribute tag %lu", tag);
 				continue;
-		}
-
-		if (total_check == 3) {
-			if (riscv_priv_spec_compatible(&priv))
-				return 0;
-			break;
 		}
 	}
 	return -ENOEXEC;
