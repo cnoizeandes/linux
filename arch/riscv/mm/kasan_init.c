@@ -35,11 +35,11 @@ static void __init populate(void *start, void *end)
 	unsigned long vaddr = (unsigned long)start & PAGE_MASK;
 	unsigned long vend = PAGE_ALIGN((unsigned long)end);
 	unsigned long n_pages = (vend - vaddr) / PAGE_SIZE;
+	unsigned long n_pmds = (n_pages % PTRS_PER_PTE) ? n_pages / PTRS_PER_PTE + 1 :
+								n_pages / PTRS_PER_PTE;
 
 	pgd_t *pgd = pgd_offset_k(vaddr);
-	p4d_t *p4d = p4d_offset(pgd, vaddr);
-	pud_t *pud = pud_offset(p4d, vaddr);
-	pmd_t *pmd = pmd_offset(pud, vaddr);
+	pmd_t *pmd = memblock_virt_alloc(n_pmds * sizeof(pmd_t), PAGE_SIZE);
 	pte_t *pte = memblock_virt_alloc(n_pages * sizeof(pte_t), PAGE_SIZE);
 
 	for (i = 0; i < n_pages; i++) {
@@ -49,9 +49,13 @@ static void __init populate(void *start, void *end)
 		set_pte(pte + i, pfn_pte(PHYS_PFN(phys), PAGE_KERNEL));
 	}
 
-	for (i = j = 0; j < n_pages; i++, j += PTRS_PER_PTE)
-		set_pmd(pmd + i, pfn_pmd(PFN_DOWN(__pa((uintptr_t)(pte + j))),
-		__pgprot(_PAGE_TABLE)));
+	for (i = 0; i < n_pages; ++pmd, i += PTRS_PER_PTE)
+		set_pmd(pmd, pfn_pmd(PFN_DOWN(__pa((uintptr_t)(pte + i))),
+				__pgprot(_PAGE_TABLE)));
+
+	for (i = vaddr; i < vend; i += PGDIR_SIZE, ++pgd)
+		set_pgd(pgd, pfn_pgd(PFN_DOWN(__pa(((uintptr_t)pmd))),
+				__pgprot(_PAGE_TABLE)));
 
 	local_flush_tlb_all();
 	memset(start, 0, end - start);
@@ -80,7 +84,8 @@ void __init kasan_init(void)
 
 	for (i = 0; i < PTRS_PER_PTE; i++)
 		set_pte(&kasan_zero_pte[i],
-			mk_pte(virt_to_page(kasan_zero_page), PAGE_READ));
+			mk_pte(virt_to_page(kasan_zero_page),
+			__pgprot(_PAGE_PRESENT | _PAGE_READ | _PAGE_ACCESSED)));
 
 	memset(kasan_zero_page, 0, PAGE_SIZE);
 
