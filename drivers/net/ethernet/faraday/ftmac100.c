@@ -273,12 +273,12 @@ static dma_addr_t ftmac100_rxdes_get_dma_addr(struct ftmac100_rxdes *rxdes)
  */
 static void ftmac100_rxdes_set_page(struct ftmac100_rxdes *rxdes, struct page *page)
 {
-	rxdes->rxdes3 = (unsigned int)page;
+	rxdes->rxdes3 = (uintptr_t)page;
 }
 
 static struct page *ftmac100_rxdes_get_page(struct ftmac100_rxdes *rxdes)
 {
-	return (struct page *)rxdes->rxdes3;
+	return (struct page *)(uintptr_t)rxdes->rxdes3;
 }
 
 /******************************************************************************
@@ -528,18 +528,23 @@ static dma_addr_t ftmac100_txdes_get_dma_addr(struct ftmac100_txdes *txdes)
 	return le32_to_cpu(txdes->txdes2);
 }
 
+static void ftmac100_txdes_skb_reset(struct ftmac100 *priv, int index)
+{
+	FTMAC100_TX_DESC_EXT(priv, index)->skb = NULL;
+}
+
 /*
  * txdes3 is not used by hardware. We use it to keep track of socket buffer.
  * Since hardware does not touch it, we can skip cpu_to_le32()/le32_to_cpu().
  */
 static void ftmac100_txdes_set_skb(struct ftmac100_txdes *txdes, struct sk_buff *skb)
 {
-	txdes->txdes3 = (unsigned int)skb;
+	txdes->txdes3 = (uintptr_t)skb;
 }
 
 static struct sk_buff *ftmac100_txdes_get_skb(struct ftmac100_txdes *txdes)
 {
-	return (struct sk_buff *)txdes->txdes3;
+	return (struct sk_buff *)(uintptr_t)txdes->txdes3;
 }
 
 /******************************************************************************
@@ -604,6 +609,7 @@ static bool ftmac100_tx_complete_packet(struct ftmac100 *priv)
 	dev_kfree_skb(skb);
 
 	ftmac100_txdes_reset(txdes);
+	ftmac100_txdes_skb_reset(priv, index);
 
 	ftmac100_tx_clean_pointer_advance(priv);
 
