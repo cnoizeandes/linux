@@ -297,6 +297,7 @@ static inline int pte_same(pte_t pte_a, pte_t pte_b)
 static inline void set_pte(pte_t *ptep, pte_t pteval)
 {
 	*ptep = pteval;
+	flush_tlb_all();
 }
 
 void flush_icache_pte(pte_t pte);

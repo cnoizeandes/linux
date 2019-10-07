@@ -19,7 +19,6 @@
 #undef flush_icache_range
 #undef flush_icache_user_range
 #undef flush_dcache_page
-#undef flush_cache_vmap
 
 static inline void local_flush_icache_all(void)
 {
@@ -32,11 +31,6 @@ static inline void flush_dcache_page(struct page *page)
 {
 	if (test_bit(PG_dcache_clean, &page->flags))
 		clear_bit(PG_dcache_clean, &page->flags);
-}
-
-static inline void flush_cache_vmap(unsigned long start, unsigned long end)
-{
-	flush_tlb_all();
 }
 
 /*
