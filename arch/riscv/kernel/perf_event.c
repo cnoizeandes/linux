@@ -536,27 +536,27 @@ static inline void riscv_pmu_event_enable(struct perf_event *event)
                         break;
         }
 }
+
 static inline int riscv_get_counter_idx(u64 config)
 {
         struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
         int idx;
-        int max_cnt = riscv_pmu->num_counters - 1;
         u64 val = config >> EVSEL_OFF;
 
         if (val == RISCV_CYCLE_COUNT) {
                 if (test_bit(RISCV_CYCLE_COUNTER, cpuc->used_mask))
-                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt,
+                        idx = find_next_zero_bit(cpuc->used_mask, RISCV_MAX_COUNTERS,
 						 BASE_COUNTERS);
                 else
                         idx = RISCV_CYCLE_COUNTER;
         } else if (val == RISCV_INSTRET) {
                 if (test_bit(RISCV_INSTRET_COUNTER, cpuc->used_mask))
-                        idx = find_next_zero_bit(cpuc->used_mask, max_cnt,
+                        idx = find_next_zero_bit(cpuc->used_mask, RISCV_MAX_COUNTERS,
 						 BASE_COUNTERS);
                 else
                         idx = RISCV_INSTRET_COUNTER;
         } else
-                idx = find_next_zero_bit(cpuc->used_mask, max_cnt,
+                idx = find_next_zero_bit(cpuc->used_mask, RISCV_MAX_COUNTERS,
 					 BASE_COUNTERS);
 
         return idx;
@@ -695,11 +695,9 @@ static int riscv_pmu_add(struct perf_event *event, int flags)
 	if (is_l2c_event(hwc->config))
 		goto add_l2c_event;
 
-	if (cpuc->n_events == riscv_pmu->num_counters)
-		return -ENOSPC;
-
 	idx = riscv_get_counter_idx(hwc->config);
-	if (WARN_ON_ONCE(idx == riscv_pmu->num_counters))
+
+	if (idx > riscv_pmu->num_counters)
 		return -ENOSPC;
 
 	cpuc->events[idx] = event;
@@ -729,7 +727,8 @@ finish_add:
 
         if (flags & PERF_EF_START)
                 riscv_pmu->pmu->start(event, PERF_EF_RELOAD);
-        return 0;
+
+	return 0;
 }
 
 /*
@@ -799,7 +798,7 @@ void riscv_base_pmu_handle_irq(struct pt_regs *regs)
         riscv_reset_overflow(status);
 
         riscv_pmu_disable();
-        for_each_set_bit(bit, &status, riscv_pmu->num_counters) {
+        for_each_set_bit(bit, &status, RISCV_MAX_COUNTERS) {
                 event = cpuc->events[bit];
 
                 if (!event)
@@ -856,16 +855,6 @@ static int riscv_event_init(struct perf_event *event)
 	perf_irq_t err = NULL;
 	int code;
 
-	if (atomic_inc_return(&riscv_active_events) == 1) {
-		err = reserve_pmc_hardware(riscv_base_pmu_handle_irq);
-
-		if (err) {
-			pr_warn("PMC hardware not available\n");
-			atomic_dec(&riscv_active_events);
-			return -EBUSY;
-		}
-	}
-
 	switch (event->attr.type) {
 	case PERF_TYPE_HARDWARE:
 		code = riscv_pmu->map_hw_event(attr->config);
@@ -878,6 +867,16 @@ static int riscv_event_init(struct perf_event *event)
 		break;
 	default:
 		return -ENOENT;
+	}
+
+	if (atomic_inc_return(&riscv_active_events) == 1) {
+		err = reserve_pmc_hardware(riscv_base_pmu_handle_irq);
+
+		if (err) {
+			pr_warn("PMC hardware not available\n");
+			atomic_dec(&riscv_active_events);
+			return -EBUSY;
+		}
 	}
 
 	event->destroy = riscv_event_destroy;
@@ -985,7 +984,7 @@ static const struct riscv_pmu riscv_base_pmu = {
 	.map_raw_event = riscv_map_raw_event,
 	.cache_events = &riscv_cache_event_map,
 	.counter_width = 63,
-	.num_counters = RISCV_MAX_COUNTERS,
+	.num_counters = RISCV_MAX_COUNTERS - 1,
 	.handle_irq = &riscv_base_pmu_handle_irq,
 	.max_period = 0xFFFFFFFF,
 	/* This means this PMU has no IRQ. */
