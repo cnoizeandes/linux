@@ -26,15 +26,12 @@ static inline void pmd_populate_kernel(struct mm_struct *mm,
 	set_pmd(pmd, __pmd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
 }
 
-int get_cache_line_size(void);
-void cpu_dma_wb_range(unsigned long start, unsigned long end);
 static inline void pmd_populate(struct mm_struct *mm,
 	pmd_t *pmd, pgtable_t pte)
 {
 	unsigned long pfn = virt_to_pfn(page_address(pte));
 
 	set_pmd(pmd, __pmd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
-	cpu_dma_wb_range((unsigned long)pmd,(unsigned long)pmd+get_cache_line_size());
 }
 
 #ifndef __PAGETABLE_PMD_FOLDED
@@ -59,8 +56,6 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 		memcpy(pgd + USER_PTRS_PER_PGD,
 			init_mm.pgd + USER_PTRS_PER_PGD,
 			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
-
-		cpu_dma_wb_range((unsigned long)pgd,(unsigned long)pgd+PTRS_PER_PGD* sizeof(pgd_t));
 	}
 	return pgd;
 }
