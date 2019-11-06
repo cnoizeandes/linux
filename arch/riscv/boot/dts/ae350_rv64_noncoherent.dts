@@ -139,6 +139,11 @@
     interrupt-parent = <&plic0>;
   };
 
+  smu: smu@f0100000 {
+    compatible = "andestech,atcsmu";
+    reg = <0x0 0xf0100000 0x0 0x1000>;
+  };
+
   lcd0: lcd@e0200000 {
     compatible = "andestech,atflcdc100";
     reg = <0x0 0xe0200000 0x0 0x1000>;

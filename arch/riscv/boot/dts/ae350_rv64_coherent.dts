@@ -100,6 +100,11 @@
     clock-frequency = <100000000>;
   };
 
+  smu: smu@f0100000 {
+    compatible = "andestech,atcsmu";
+    reg = <0x0 0xf0100000 0x0 0x1000>;
+  };
+
   timer0: timer@f0400000 {
     compatible = "andestech,atcpit100";
     reg = <0x0 0xf0400000 0x0 0x1000>;
