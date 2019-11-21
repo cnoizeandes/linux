@@ -258,6 +258,12 @@ config RISCV_BASE_PMU
 
 endmenu
 
+config DSP
+       bool "DSP support"
+       default y
+       help
+         Say N here if you want to disable DSP support.
+
 config FPU
 	bool "FPU support"
 	default y

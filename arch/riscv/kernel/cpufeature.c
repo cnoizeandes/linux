@@ -16,6 +16,10 @@ unsigned long elf_hwcap __read_mostly;
 #ifdef CONFIG_FPU
 bool has_fpu __read_mostly;
 #endif
+#ifdef CONFIG_DSP
+bool has_dsp __read_mostly;
+#endif
+
 
 void riscv_fill_hwcap(void)
 {
@@ -70,5 +74,9 @@ void riscv_fill_hwcap(void)
 #ifdef CONFIG_FPU
 	if (elf_hwcap & (COMPAT_HWCAP_ISA_F | COMPAT_HWCAP_ISA_D))
 		has_fpu = true;
+#endif
+#ifdef CONFIG_DSP
+       if (strstr(elf_platform, "xdsp"))
+               has_dsp = true;
 #endif
 }
