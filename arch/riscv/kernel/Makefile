@@ -12,6 +12,7 @@ extra-y += vmlinux.lds
 
 obj-y	+= cpu.o
 obj-y	+= cpufeature.o
+obj-y	+= elf.o
 obj-y	+= entry.o
 obj-y	+= irq.o
 obj-y	+= process.o
