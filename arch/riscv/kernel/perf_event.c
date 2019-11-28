@@ -62,7 +62,7 @@ typedef void (*perf_irq_t)(struct pt_regs *);
 perf_irq_t perf_irq = NULL;
 static cpumask_t pmu_cpu;
 static struct l2c_hw_events l2c_hw_events;
-static void __iomem *l2c_base;
+void __iomem *l2c_base;
 /*
  * Hardware & cache maps and their methods
  */
