@@ -150,16 +150,15 @@ void cpu_play_dead(void)
 		// enable privilege
 		sbi_suspend_prepare(false, true);
 		goto exit_dead;
-	} else if (suspend_begin == PM_SUSPEND_STANDBY) {
-		sbi_suspend_prepare(false, false);
-		set_wakeup_enable(cpu, 1 << PCS_WAKE_MSIP_OFF);
-		set_sleep(cpu, LightSleep_CTL);
-		cpu_dcache_disable(NULL);
-		__asm__ volatile ("wfi\n\t");
-		cpu_dcache_enable(NULL);
-		sbi_suspend_prepare(false, true);
-		goto exit_dead;
 	}
+	sbi_suspend_prepare(false, false);
+	set_wakeup_enable(cpu, 1 << PCS_WAKE_MSIP_OFF);
+	set_sleep(cpu, LightSleep_CTL);
+	cpu_dcache_disable(NULL);
+	wait_for_interrupt();
+	cpu_dcache_enable(NULL);
+	sbi_suspend_prepare(false, true);
+	goto exit_dead;
 #endif
 	/* Do not disable software interrupt to restart cpu after WFI */
 	csr_clear(sie, SIE_STIE | SIE_SEIE);
