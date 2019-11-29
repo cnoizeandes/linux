@@ -38,6 +38,7 @@
 #include <asm/sections.h>
 #include <asm/sbi.h>
 #include <asm/andesv5/smu.h>
+#include <asm/andesv5/proc.h>
 void *__cpu_up_stack_pointer[NR_CPUS];
 void *__cpu_up_task_pointer[NR_CPUS];
 
@@ -139,24 +140,24 @@ void cpu_play_dead(void)
 #ifdef CONFIG_ATCSMU
 	if (suspend_begin == PM_SUSPEND_MEM) {
 		// Disable higher privilege's non-wakeup event
-		SBI_CALL_2(SBI_SUSPEND_PREPARE, 0, 0);
+		sbi_suspend_prepare(false, false);
 		// set SMU wakeup enable & MISC control
 		set_wakeup_enable(cpu, 1 << PCS_WAKE_MSIP_OFF);
 		// set SMU light sleep command
 		set_sleep(cpu, DeepSleep_CTL);
 		// backup, suspend and resume
-		SBI_CALL_0(SBI_SUSPEND_MEM);
+		sbi_suspend_mem();
 		// enable privilege
-		SBI_CALL_2(SBI_SUSPEND_PREPARE, 0, 1);
+		sbi_suspend_prepare(false, true);
 		goto exit_dead;
 	} else if (suspend_begin == PM_SUSPEND_STANDBY) {
-		SBI_CALL_2(SBI_SUSPEND_PREPARE, 0, 0);
+		sbi_suspend_prepare(false, false);
 		set_wakeup_enable(cpu, 1 << PCS_WAKE_MSIP_OFF);
 		set_sleep(cpu, LightSleep_CTL);
-		SBI_CALL_1(SBI_DCACHE_OP, 0);
+		cpu_dcache_disable(NULL);
 		__asm__ volatile ("wfi\n\t");
-		SBI_CALL_1(SBI_DCACHE_OP, 1);
-		SBI_CALL_2(SBI_SUSPEND_PREPARE, 0, 1);
+		cpu_dcache_enable(NULL);
+		sbi_suspend_prepare(false, true);
 		goto exit_dead;
 	}
 #endif

@@ -5,10 +5,11 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/of.h>
+#include <linux/reboot.h>
 
 #include <asm/tlbflush.h>
-#include <asm/sbi.h>
 #include <asm/andesv5/smu.h>
+#include <asm/andesv5/proc.h>
 
 struct atc_smu {
         void __iomem *base;
@@ -69,10 +70,6 @@ void set_sleep(int cpu, unsigned char sleep)
 		readl((void *)(smu->base + CN_PCS_STATUS_OFF(cpu))));
 
 }
-void sbi_disable_dcache(void *info)
-{
-	SBI_CALL_1(SBI_DCACHE_OP, 0);
-}
 
 extern int num_cpus;
 void andes_suspend2ram(void)
@@ -86,7 +83,7 @@ void andes_suspend2ram(void)
 	int id = 0;
 #endif
 	// Disable higher privilege's non-wakeup event
-	SBI_CALL_2(SBI_SUSPEND_PREPARE, 1, 0);
+	sbi_suspend_prepare(true, false);
 
 	// polling SMU other CPU's PD_status
 	while (ready_cnt) {
@@ -109,9 +106,9 @@ void andes_suspend2ram(void)
 	// set SMU light sleep command
 	set_sleep(id, DeepSleep_CTL);
 	// backup, suspend and resume
-	SBI_CALL_0(SBI_SUSPEND_MEM);
+	sbi_suspend_mem();
 	// enable privilege
-	SBI_CALL_2(SBI_SUSPEND_PREPARE, 1, 1);
+	sbi_suspend_prepare(true, true);
 }
 
 void andes_suspend2standby(void)
@@ -125,7 +122,7 @@ void andes_suspend2standby(void)
 	int id = 0;
 #endif
 	// Disable higher privilege's non-wakeup event
-	SBI_CALL_2(SBI_SUSPEND_PREPARE, 1, 0);
+	sbi_suspend_prepare(true, false);
 
 	// polling SMU other CPU's PD_status
 	while (ready_cnt) {
@@ -149,17 +146,49 @@ void andes_suspend2standby(void)
 	set_sleep(id, LightSleep_CTL);
 
 	// flush dcache & dcache off
-	SBI_CALL_1(SBI_DCACHE_OP, 0);
+	cpu_dcache_disable(NULL);
 
 	// wfi
-	__asm__ volatile ("wfi\n\t");
+	wait_for_interrupt();
 
 	// enable D-cache
-	SBI_CALL_1(SBI_DCACHE_OP, 1);
+	cpu_dcache_enable(NULL);
 
 	// enable privilege
-	SBI_CALL_2(SBI_SUSPEND_PREPARE, 1, 1);
+	sbi_suspend_prepare(true, true);
 }
+
+static int atcsmu100_restart_call(struct notifier_block *nb,
+				  unsigned long action, void *data)
+{
+	int cpu_num = num_online_cpus();
+#ifdef CONFIG_SMP
+	int id = smp_processor_id();
+	int i;
+
+	for (i = 0; i < cpu_num; i++) {
+		int ret;
+		if (i == id)
+			continue;
+		ret = smp_call_function_single(i, cpu_dcache_disable,
+						NULL, true);
+		if (ret)
+			pr_err("Disable D-cache FAIL\n"
+				"ERROR CODE:%d\n", ret);
+	}
+#else
+	int id = 0;
+#endif
+	cpu_dcache_disable(NULL);
+	cpu_l2c_disable();
+	sbi_restart(num_online_cpus());
+	return 0;
+}
+
+static struct notifier_block atcsmu100_restart = {
+	.notifier_call = atcsmu100_restart_call,
+	.priority = 128,
+};
 
 static int atcsmu_probe(struct platform_device *pdev)
 {
@@ -190,6 +219,8 @@ static int atcsmu_probe(struct platform_device *pdev)
 
 	for(pcs = 0; pcs < MAX_PCS_SLOT; pcs++)
 		writel(0xffdfffff, (void *)(smu->base + PCSN_WE_OFF(pcs)));
+
+	register_restart_handler(&atcsmu100_restart);
 
 	return 0;
 err_ioremap:

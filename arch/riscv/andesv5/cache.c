@@ -144,7 +144,7 @@ void cpu_dcache_disable(void *info)
 
 	local_irq_save(flags);
 	SBI_CALL_1(SBI_DCACHE_OP, 0);
-    local_irq_restore(flags);
+	local_irq_restore(flags);
 }
 
 /* L2 Cache */
