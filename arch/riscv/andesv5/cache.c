@@ -6,6 +6,7 @@
 #include <linux/of_device.h>
 #include <linux/cacheinfo.h>
 #include <linux/sizes.h>
+#include <linux/smp.h>
 #include <asm/csr.h>
 #include <asm/sbi.h>
 #include <asm/io.h>
@@ -160,11 +161,11 @@ uint32_t cpu_l2c_get_cctl_status(void)
 void cpu_l2c_enable(void)
 {
 #ifdef CONFIG_SMP
-    int mhartid = smp_processor_id();
+	int mhartid = smp_processor_id();
 #else
 	int mhartid = 0;
 #endif
-	unsigned int = val;
+	unsigned int val;
 
 	/* No l2 cache */
 	if(!l2c_base)
@@ -174,6 +175,7 @@ void cpu_l2c_enable(void)
 	if(cpu_l2c_ctl_status() & L2_CACHE_CTL_mskCEN)
 		return;
 
+	/* Enable l2 cache*/
 	val = readl((void*)(l2c_base + L2C_REG_CTL_OFFSET));
 	val |= L2_CACHE_CTL_mskCEN;
 
@@ -185,21 +187,26 @@ void cpu_l2c_enable(void)
 void cpu_l2c_disable(void)
 {
 #ifdef CONFIG_SMP
-    int mhartid = smp_processor_id();
+	int mhartid = smp_processor_id();
 #else
 	int mhartid = 0;
 #endif
-	unsigned int = val;
+	unsigned int val;
 
-	if(!l2c_base) return;
-	if(!(cpu_l2c_ctl_status() & L2_CACHE_CTL_mskCEN)) return;
+	/*No l2 cache */
+	if(!l2c_base)
+		return;
+
+	/*l2 cache has disabled*/
+	if(!(cpu_l2c_ctl_status() & L2_CACHE_CTL_mskCEN))
+		return;
 
 	/*L2 write-back and invalidate all*/
-	writel(CCTL_L2_WBINVAL_ALL, (void*)(l2c_base + L2C_REG_C0_CMD_OFFSET(mhartid)));
+	writel(CCTL_L2_WBINVAL_ALL, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
 	while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
 	       != CCTL_L2_STATUS_IDLE);
 
-	/*disable L2 cache*/
+	/*Disable L2 cache*/
 	val = readl((void*)(l2c_base + L2C_REG_CTL_OFFSET));
 	val &= (~L2_CACHE_CTL_mskCEN);
 
