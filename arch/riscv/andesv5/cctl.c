@@ -148,7 +148,7 @@ static ssize_t proc_write_cache_en(struct file *file,
 #ifdef CONFIG_SMP
 			cpu_icache_smp_enable();
 #else
-			cpu_icache_enable(NULL);	
+			cpu_icache_enable(NULL);
 #endif
 			DEBUG(debug, 1, "I-cache: Enabled\n");
 		} else if (!en && (cpu_l1c_status() & CACHE_CTL_mskIC_EN)) {
@@ -162,9 +162,9 @@ static ssize_t proc_write_cache_en(struct file *file,
 	} else if(!strncmp(file->f_path.dentry->d_name.name, "dc_en", 7)) {
 		if (en && !(cpu_l1c_status() & CACHE_CTL_mskDC_EN)) {
 #ifdef CONFIG_SMP
-			cpu_dcache_smp_enable();	
+			cpu_dcache_smp_enable();
 #else
-			cpu_dcache_enable(NULL);	
+			cpu_dcache_enable(NULL);
 #endif
 			DEBUG(debug, 1, "D-cache: Enabled\n");
 		} else if (!en && (cpu_l1c_status() & CACHE_CTL_mskDC_EN)) {
@@ -177,14 +177,14 @@ static ssize_t proc_write_cache_en(struct file *file,
 		}
 	}else if(!strncmp(file->f_path.dentry->d_name.name, "l2c_en", 7)){
 		if (en && !(cpu_l2c_ctl_status() & L2_CACHE_CTL_mskCEN)) {
-			cpu_l2c_enable();	
+			cpu_l2c_enable();
 			DEBUG(debug, 1, "L2-cache: Enabled\n");
 		} else if (!en && (cpu_l2c_ctl_status() & L2_CACHE_CTL_mskCEN)) {
 			cpu_l2c_disable();
 			DEBUG(debug, 1, "L2-cache: Disabled\n");
 		}
 	}else{
-		return -EFAULT;		
+		return -EFAULT;
 	}
 
 	return count;

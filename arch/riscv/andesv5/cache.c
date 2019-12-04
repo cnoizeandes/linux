@@ -21,7 +21,7 @@
 #define SEL_PER_CTL	8
 #define SEL_OFF(id)	(8 * (id % 8))
 
-extern void __iomem *l2c_base;
+static void __iomem *l2c_base;
 
 DEFINE_PER_CPU(struct andesv5_cache_info, cpu_cache_info) = {
 	.init_done = 0,
@@ -304,7 +304,7 @@ int cpu_l2c_get_counter_idx(struct l2c_hw_events *l2c)
 	return idx;
 }
 
-void l2c_write_counter(int idx, u64 value, void __iomem *l2c_base)
+void l2c_write_counter(int idx, u64 value)
 {
 	u32 vall = value;
 	u32 valh = value >> 32;
@@ -313,7 +313,7 @@ void l2c_write_counter(int idx, u64 value, void __iomem *l2c_base)
 	writel(valh, (void*)(l2c_base + L2C_REG_CN_HPM_OFFSET(idx) + 0x4));
 }
 
-u64 l2c_read_counter(int idx, void __iomem *l2c_base)
+u64 l2c_read_counter(int idx)
 {
 	u32 vall = readl((void*)(l2c_base + L2C_REG_CN_HPM_OFFSET(idx)));
 	u32 valh = readl((void*)(l2c_base + L2C_REG_CN_HPM_OFFSET(idx) + 0x4));
@@ -322,7 +322,7 @@ u64 l2c_read_counter(int idx, void __iomem *l2c_base)
 	return val;
 }
 
-void l2c_pmu_disable_counter(int idx, void __iomem *l2c_base)
+void l2c_pmu_disable_counter(int idx)
 {
 	int n = idx / SEL_PER_CTL;
 	u32 vall = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
@@ -337,7 +337,7 @@ void l2c_pmu_disable_counter(int idx, void __iomem *l2c_base)
 }
 
 #ifndef CONFIG_SMP
-void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base)
+void l2c_pmu_event_enable(u64 config, int idx)
 {
 	int n = idx / SEL_PER_CTL;
 	u32 vall = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
@@ -352,7 +352,7 @@ void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base)
 	writel(valh, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
 }
 #else
-void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base)
+void l2c_pmu_event_enable(u64 config, int idx)
 {
 	int n = idx / SEL_PER_CTL;
 	int mhartid = smp_processor_id();
@@ -372,3 +372,14 @@ void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base)
 }
 #endif
 #endif
+
+int __init l2c_init(void)
+{
+	struct device_node *node ;
+
+	node = of_find_compatible_node(NULL, NULL, "cache");
+	l2c_base = of_iomap(node, 0);
+
+	return 0;
+}
+arch_initcall(l2c_init)

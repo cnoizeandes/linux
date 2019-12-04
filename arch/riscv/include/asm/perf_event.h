@@ -191,8 +191,8 @@ struct riscv_pmu {
 
 void riscv_perf_interrupt(struct pt_regs *regs);
 int cpu_l2c_get_counter_idx(struct l2c_hw_events *l2c);
-void l2c_write_counter(int idx, u64 value, void __iomem *l2c_base);
-u64 l2c_read_counter(int idx, void __iomem *l2c_base);
-void l2c_pmu_disable_counter(int idx, void __iomem *l2c_base);
-void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base);
+void l2c_write_counter(int idx, u64 value);
+u64 l2c_read_counter(int idx);
+void l2c_pmu_disable_counter(int idx);
+void l2c_pmu_event_enable(u64 config, int idx);
 #endif /* _ASM_RISCV_PERF_EVENT_H */
