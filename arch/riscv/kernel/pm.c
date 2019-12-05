@@ -7,14 +7,11 @@
 #include <linux/printk.h>
 #include <linux/suspend.h>
 
-#include <asm/andesv5/smu.h>
 extern unsigned int *wake_mask;
 extern void __iomem *plic_base;
 #define PLIC_PEND_OFF	0x1000
 #define MAX_DEVICES	1024
 #define MAX_USE_REGS	MAX_DEVICES / 32
-
-int suspend_begin;
 
 static void riscv_suspend_cpu(void)
 {
@@ -44,12 +41,10 @@ static int riscv_pm_enter(suspend_state_t state)
 	pr_debug("%s:state:%d\n", __func__, state);
 	switch (state) {
 	case PM_SUSPEND_STANDBY:
-		andes_suspend2standby();
-//		riscv_suspend_cpu();
+		riscv_suspend_cpu();
 		return 1;
 	case PM_SUSPEND_MEM:
-		andes_suspend2ram();
-//		riscv_suspend2ram();
+		riscv_suspend2ram();
 		return 1;
 	default:
 		return -EINVAL;
@@ -61,24 +56,16 @@ static int riscv_pm_valid(suspend_state_t state)
 	switch (state) {
 	case PM_SUSPEND_ON:
 	case PM_SUSPEND_STANDBY:
-		suspend_begin = PM_SUSPEND_STANDBY;
 	case PM_SUSPEND_MEM:
-		suspend_begin = PM_SUSPEND_MEM;
 		return 1;
 	default:
 		return -EINVAL;
 	}
 }
 
-static void riscv_pm_end(void)
-{
-	suspend_begin = 0;
-}
-
 static const struct platform_suspend_ops riscv_pm_ops = {
 	.valid = riscv_pm_valid,
 	.enter = riscv_pm_enter,
-	.end   = riscv_pm_end,
 };
 
 static int __init riscv_pm_init(void)
