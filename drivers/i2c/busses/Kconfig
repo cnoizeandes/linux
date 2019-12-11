@@ -382,6 +382,31 @@ config I2C_AT91
 	  the latency to fill the transmission register is too long. If you
 	  are facing this situation, use the i2c-gpio driver.
 
+config I2C_ATCIIC100
+	tristate "Andes AE350 I2C interface"
+	depends on PLAT_AE350
+	help
+	  This supports the use of the I2C interface on Andes AE350
+	  processors.
+
+choice
+	depends on I2C_ATCIIC100
+	prompt "Transfer mode selection"
+	default ATCIIC_PIO
+config ATCIIC_PIO
+	bool "Pio mode"
+config ATCIIC_IRQ
+	bool "Irq mode"
+endchoice
+
+config ATCIIC100_DEBUG
+	bool "atciic100 debugging"
+default n
+	depends on I2C_ATCIIC100 != n
+	help
+	  This is an option for use by developers; most people should
+	  say N here.  This enables atciic100 driver debugging.
+
 config I2C_AU1550
 	tristate "Au1550/Au1200/Au1300 SMBus interface"
 	depends on MIPS_ALCHEMY
