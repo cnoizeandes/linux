@@ -21,16 +21,21 @@
 
 #include <linux/types.h>
 
-extern void __iomem *ioremap(phys_addr_t offset, unsigned long size);
+extern void __iomem *ioremap(phys_addr_t offset, size_t size);
 
 /*
  * The RISC-V ISA doesn't yet specify how to query or modify PMAs, so we can't
  * change the properties of memory regions.  This should be fixed by the
  * upcoming platform spec.
  */
-#define ioremap_nocache(addr, size) ioremap((addr), (size))
-#define ioremap_wc(addr, size) ioremap((addr), (size))
-#define ioremap_wt(addr, size) ioremap((addr), (size))
+/*
+ * That being said, before PMA is ready, Andes augmented PA with an MSB bit
+ * to indicate the non-cacheability.
+ */
+#define ioremap_nocache ioremap_nocache
+extern void __iomem *ioremap_nocache(phys_addr_t offset, size_t size);
+#define ioremap_wc(addr, size) ioremap_nocache((addr), (size))
+#define ioremap_wt(addr, size) ioremap_nocache((addr), (size))
 
 extern void iounmap(volatile void __iomem *addr);
 

@@ -71,13 +71,22 @@ static void __iomem *__ioremap_caller(phys_addr_t addr, size_t size,
  *
  * Must be freed with iounmap.
  */
-void __iomem *ioremap(phys_addr_t offset, unsigned long size)
+void __iomem *ioremap(phys_addr_t offset, size_t size)
 {
 	return __ioremap_caller(offset, size, PAGE_KERNEL,
 		__builtin_return_address(0));
 }
 EXPORT_SYMBOL(ioremap);
 
+void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
+{
+	void __iomem *ret;
+	pgprot_t pgprot = pgprot_noncached(PAGE_KERNEL);
+	ret =  __ioremap_caller(offset, size, pgprot,
+		__builtin_return_address(0));
+	return ret;
+}
+EXPORT_SYMBOL(ioremap_nocache);
 
 /**
  * iounmap - Free a IO remapping

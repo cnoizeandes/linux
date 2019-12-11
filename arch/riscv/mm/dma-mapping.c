@@ -98,15 +98,9 @@ extern const struct dma_map_ops swiotlb_noncoh_dma_ops;
 void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 			const struct iommu_ops *iommu, bool coherent)
 {
-#ifdef CONFIG_SWIOTLB
 	if(coherent)
 		dev->dma_ops = &swiotlb_dma_ops;
 	else
 		dev->dma_ops = &swiotlb_noncoh_dma_ops;
-#else
-	if(coherent)
-		dev->dma_ops = &dma_direct_ops;
-	else
-		dev->dma_ops = &dma_noncoherent_ops;
-#endif
+	dev->archdata.dma_coherent = coherent;
 }

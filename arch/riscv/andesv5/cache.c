@@ -51,20 +51,48 @@ inline int get_cache_line_size(void)
 		fill_cpu_cache_info(cpu_ci);
 	return cpu_ci->dcache_line_size;
 }
+
+static uint32_t cpu_l2c_get_cctl_status(void)
+{
+	return readl((void*)(l2c_base + L2C_REG_STATUS_OFFSET));
+}
+
 void cpu_dcache_wb_range(unsigned long start, unsigned long end, int line_size)
 {
+	int mhartid = smp_processor_id();
+	unsigned long pa;
 	while (end > start) {
 		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
 		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_WB);
+
+		if (l2c_base) {
+			pa = virt_to_phys(start);
+			writel(pa, (void*)(l2c_base + L2C_REG_CN_ACC_OFFSET(mhartid)));
+			writel(CCTL_L2_PA_WB, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
+			while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
+				!= CCTL_L2_STATUS_IDLE);
+		}
+
 		start += line_size;
 	}
 }
 
 void cpu_dcache_inval_range(unsigned long start, unsigned long end, int line_size)
 {
+	int mhartid = smp_processor_id();
+	unsigned long pa;
 	while (end > start) {
 		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
 		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_INVAL);
+
+		if (l2c_base) {
+			pa = virt_to_phys(start);
+			writel(pa, (void*)(l2c_base + L2C_REG_CN_ACC_OFFSET(mhartid)));
+			writel(CCTL_L2_PA_INVAL, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
+			while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
+				!= CCTL_L2_STATUS_IDLE);
+		}
+
 		start += line_size;
 	}
 }
@@ -151,11 +179,6 @@ void cpu_dcache_disable(void *info)
 uint32_t cpu_l2c_ctl_status(void)
 {
 	return readl((void*)(l2c_base + L2C_REG_CTL_OFFSET));
-}
-
-uint32_t cpu_l2c_get_cctl_status(void)
-{
-	return readl((void*)(l2c_base + L2C_REG_STATUS_OFFSET));
 }
 
 void cpu_l2c_enable(void)
