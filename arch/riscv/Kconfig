@@ -243,12 +243,6 @@ config ANDES_PMU
 	  Andes PMU provide extension registers for Performance counter.
 endchoice
 
-config ATCSMU
-	bool "SMU support"
-	default y
-	help
-	 Say N here if you want to disable SMU support
-
 config DSP
        bool "DSP support"
        default y

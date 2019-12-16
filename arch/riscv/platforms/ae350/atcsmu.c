@@ -176,12 +176,10 @@ static int atcsmu100_restart_call(struct notifier_block *nb,
 			pr_err("Disable D-cache FAIL\n"
 				"ERROR CODE:%d\n", ret);
 	}
-#else
-	int id = 0;
 #endif
 	cpu_dcache_disable(NULL);
 	cpu_l2c_disable();
-	sbi_restart(num_online_cpus());
+	sbi_restart(cpu_num);
 	return 0;
 }
 
