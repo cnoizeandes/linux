@@ -117,8 +117,6 @@ static ssize_t proc_read_cache_en(struct file *file, char __user *userbuf,
         ret = sprintf(buf, "I-cache: %s\n", (cpu_l1c_status() & CACHE_CTL_mskIC_EN) ? "Enabled" : "Disabled");
     else if(!strncmp(file->f_path.dentry->d_name.name, "dc_en", 7))
         ret = sprintf(buf, "D-cache: %s\n", (cpu_l1c_status() & CACHE_CTL_mskDC_EN) ? "Enabled" : "Disabled");
-	else if(!strncmp(file->f_path.dentry->d_name.name, "l2c_en", 7))
-        ret = sprintf(buf, "L2-cache: %s\n", (cpu_l2c_ctl_status() & L2_CACHE_CTL_mskCEN) ? "Enabled" : "Disabled");
 	else
 		return -EFAULT;
 
@@ -175,14 +173,6 @@ static ssize_t proc_write_cache_en(struct file *file,
 #endif
 			DEBUG(debug, 1, "D-cache: Disabled\n");
 		}
-	}else if(!strncmp(file->f_path.dentry->d_name.name, "l2c_en", 7)){
-		if (en && !(cpu_l2c_ctl_status() & L2_CACHE_CTL_mskCEN)) {
-			cpu_l2c_enable();
-			DEBUG(debug, 1, "L2-cache: Enabled\n");
-		} else if (!en && (cpu_l2c_ctl_status() & L2_CACHE_CTL_mskCEN)) {
-			cpu_l2c_disable();
-			DEBUG(debug, 1, "L2-cache: Disabled\n");
-		}
 	}else{
 		return -EFAULT;
 	}
@@ -228,7 +218,6 @@ struct entry_struct proc_table_cache[] = {
 
 	{"ic_en", 0644, &en_fops},
 	{"dc_en", 0644, &en_fops},
-	{"l2c_en", 0644, &en_fops}
 };
 static int __init init_cctl(void)
 {

@@ -7,7 +7,6 @@ void cpu_icache_disable(void *info);
 void cpu_dcache_enable(void *info);
 void cpu_dcache_disable(void *info);
 uint32_t cpu_l2c_ctl_status(void);
-void cpu_l2c_enable(void);
 void cpu_l2c_disable(void);
 
 void cpu_dma_inval_range(unsigned long start, unsigned long end);
