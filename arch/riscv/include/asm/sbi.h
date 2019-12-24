@@ -35,6 +35,7 @@
 #define SBI_ICACHE_OP 16
 #define SBI_L1CACHE_STATUS 17
 #define SBI_RESTART 18
+#define SBI_SET_RESET_VEC 19
 
 #define SBI_CALL(which, arg0, arg1, arg2) ({			\
 	register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);	\
@@ -53,6 +54,11 @@
 #define SBI_CALL_1(which, arg0) SBI_CALL(which, arg0, 0, 0)
 #define SBI_CALL_2(which, arg0, arg1) SBI_CALL(which, arg0, arg1, 0)
 #define SBI_CALL_3(which, arg0, arg1, arg2) SBI_CALL(which, arg0, arg1, arg2)
+
+static inline void sbi_set_reset_vec(int val)
+{
+	SBI_CALL_1(SBI_SET_RESET_VEC, val);
+}
 
 static inline void sbi_restart(int val)
 {
