@@ -51,6 +51,11 @@
 #define SBI_CALL_4(which, arg0, arg1, arg2, arg3) \
 		SBI_CALL(which, arg0, arg1, arg2, arg3)
 
+static inline void sbi_set_reset_vec(int val)
+{
+	SBI_CALL_1(SBI_SET_RESET_VEC, val);
+}
+
 static inline void sbi_console_putchar(int ch)
 {
 	SBI_CALL_1(SBI_CONSOLE_PUTCHAR, ch);
