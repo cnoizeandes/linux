@@ -5,10 +5,11 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/of.h>
+#include <linux/reboot.h>
 
 #include <asm/tlbflush.h>
-#include <asm/sbi.h>
 #include <asm/andesv5/smu.h>
+#include <asm/andesv5/proc.h>
 
 struct atc_smu {
         void __iomem *base;
@@ -35,42 +36,45 @@ int get_pd_status(unsigned int cpu)
 	return GET_PD_STATUS(val);
 }
 
-void set_wakeup_enable(int cpu, unsigned int events, bool reset)
+void set_wakeup_enable(int cpu, unsigned int events)
 {
 	struct atc_smu *smu = &atcsmu;
 
-	if (reset)
-		writel(0xffdfffff, (void *)(smu->base + PCS0_WE_OFF));
-	else {
-		events |= (1 << 28);
-		writel(events, (void *)(smu->base + CN_PCS_WE_OFF(cpu)));
-	}
+	if (cpu == 0)
+		events |= (1 << PCS_WAKE_DBG_OFF);
+	writel(events, (void *)(smu->base + CN_PCS_WE_OFF(cpu)));
 }
 
-void set_sleep(int cpu, unsigned char sleep, bool reset)
+void set_sleep(int cpu, unsigned char sleep)
 {
 	struct atc_smu *smu = &atcsmu;
 	unsigned int val = readl((void *)(smu->base + CN_PCS_CTL_OFF(cpu)));
 	unsigned char *ctl = (unsigned char *)&val;
 
-	if (reset) {
-		*ctl = 0;
-		writel(val , (void *)(smu->base + PCS0_CTL_OFF));
-		return ;
-	}
 	// set sleep cmd
 	*ctl = 0;
 	*ctl = *ctl | SLEEP_CMD;
 	// set param
 	*ctl = *ctl | (sleep << PCS_CTL_PARAM_OFF);
-
 	writel(val, (void *)(smu->base + CN_PCS_CTL_OFF(cpu)));
+
+	pr_debug("PCS%d after setting up PCS_CTL register:\n"
+	       "PCS_WE: 0x%x\n"
+	       "The value wants to write into PCS_CTL:%x\n"
+	       "PCS_CTL: 0x%x\n"
+	       "PCS_STATUS: 0x%x\n",
+		cpu + 3,
+		readl((void *)(smu->base + CN_PCS_WE_OFF(cpu))),
+		val,
+		readl((void *)(smu->base + CN_PCS_CTL_OFF(cpu))),
+		readl((void *)(smu->base + CN_PCS_STATUS_OFF(cpu))));
+
 }
 
+extern int num_cpus;
 void andes_suspend2ram(void)
 {
 	unsigned int cpu, status, type;
-	unsigned int num_cpus = num_online_cpus();
 	int ready_cnt = num_cpus - 1;
 	int ready_cpu[NR_CPUS] = {0};
 #ifdef CONFIG_SMP
@@ -79,7 +83,7 @@ void andes_suspend2ram(void)
 	int id = 0;
 #endif
 	// Disable higher privilege's non-wakeup event
-	SBI_CALL_2(SBI_SUSPEND_PREPARE, 1, 0);
+	sbi_suspend_prepare(true, false);
 
 	// polling SMU other CPU's PD_status
 	while (ready_cnt) {
@@ -96,24 +100,21 @@ void andes_suspend2ram(void)
 			}
 		}
 	}
-	// set SMU wakeup enable & MISC control
-	set_wakeup_enable(id, *wake_mask, 0);
-	// set SMU light sleep command
-	set_sleep(id, DeepSleep_CTL, 0);
-	// backup, suspend and resume
-	SBI_CALL_0(SBI_SUSPEND_MEM);
 
-	// reset SMU register
-	//set_sleep(id, DeepSleep_CTL, 1);
-	//set_wakeup_enable(id, *wake_mask, 1);
+	// set SMU wakeup enable & MISC control
+	set_wakeup_enable(id, *wake_mask);
+	// set SMU light sleep command
+	set_sleep(id, DeepSleep_CTL);
+	// backup, suspend and resume
+	sbi_suspend_mem();
 	// enable privilege
-	SBI_CALL_2(SBI_SUSPEND_PREPARE, 1, 1);
+	sbi_suspend_prepare(true, true);
 }
 
 void andes_suspend2standby(void)
 {
-	int cpu, status, type;
-	int ready_cnt = NR_CPUS - 1;
+	unsigned int cpu, status, type;
+	int ready_cnt = num_cpus - 1;
 	int ready_cpu[NR_CPUS] = {0};
 #ifdef CONFIG_SMP
 	int id = smp_processor_id();
@@ -121,11 +122,11 @@ void andes_suspend2standby(void)
 	int id = 0;
 #endif
 	// Disable higher privilege's non-wakeup event
-	SBI_CALL_2(SBI_SUSPEND_PREPARE, 1, 0);
+	sbi_suspend_prepare(true, false);
 
 	// polling SMU other CPU's PD_status
 	while (ready_cnt) {
-		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		for (cpu = 0; cpu < num_cpus; cpu++) {
 			if (cpu == id || ready_cpu[cpu] == 1)
 				continue;
 
@@ -139,29 +140,53 @@ void andes_suspend2standby(void)
 		}
 	}
 	// set SMU wakeup enable & MISC control
-	set_wakeup_enable(id, *wake_mask, 0);
+	set_wakeup_enable(id, *wake_mask);
 
 	// set SMU light sleep command
-	set_sleep(id, LightSleep_CTL, 0);
+	set_sleep(id, LightSleep_CTL);
 
 	// flush dcache & dcache off
-	SBI_CALL_1(SBI_DCACHE_OP, 0);
+	cpu_dcache_disable(NULL);
 
 	// wfi
-	__asm__ volatile ("wfi\n\t");
+	wait_for_interrupt();
 
 	// enable D-cache
-	SBI_CALL_1(SBI_DCACHE_OP, 1);
-
-	// reset SMU wakeup enable
-	set_wakeup_enable(id, *wake_mask, 1);
-
-	// reset SMU light sleep command
-	set_sleep(id, LightSleep_CTL, 1);
+	cpu_dcache_enable(NULL);
 
 	// enable privilege
-	SBI_CALL_2(SBI_SUSPEND_PREPARE, 1, 1);
+	sbi_suspend_prepare(true, true);
 }
+
+static int atcsmu100_restart_call(struct notifier_block *nb,
+				  unsigned long action, void *data)
+{
+	int cpu_num = num_online_cpus();
+#ifdef CONFIG_SMP
+	int id = smp_processor_id();
+	int i;
+
+	for (i = 0; i < cpu_num; i++) {
+		int ret;
+		if (i == id)
+			continue;
+		ret = smp_call_function_single(i, cpu_dcache_disable,
+						NULL, true);
+		if (ret)
+			pr_err("Disable D-cache FAIL\n"
+				"ERROR CODE:%d\n", ret);
+	}
+#endif
+	cpu_dcache_disable(NULL);
+	cpu_l2c_disable();
+	sbi_restart(cpu_num);
+	return 0;
+}
+
+static struct notifier_block atcsmu100_restart = {
+	.notifier_call = atcsmu100_restart_call,
+	.priority = 128,
+};
 
 static int atcsmu_probe(struct platform_device *pdev)
 {
@@ -192,6 +217,8 @@ static int atcsmu_probe(struct platform_device *pdev)
 
 	for(pcs = 0; pcs < MAX_PCS_SLOT; pcs++)
 		writel(0xffdfffff, (void *)(smu->base + PCSN_WE_OFF(pcs)));
+
+	register_restart_handler(&atcsmu100_restart);
 
 	return 0;
 err_ioremap:

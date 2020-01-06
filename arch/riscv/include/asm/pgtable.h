@@ -89,6 +89,12 @@ extern pgd_t swapper_pg_dir[];
 #define __S110	PAGE_SHARED_EXEC
 #define __S111	PAGE_SHARED_EXEC
 
+#define pgprot_noncached pgprot_noncached
+static inline pgprot_t pgprot_noncached(pgprot_t _prot)
+{
+       return __pgprot(pgprot_val(_prot) | _PAGE_NONCACHEABLE);
+}
+
 /*
  * ZERO_PAGE is a global shared page that is always zero,
  * used for zero-mapped memory areas, etc.
@@ -114,6 +120,7 @@ static inline int pmd_bad(pmd_t pmd)
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
 	*pmdp = pmd;
+	local_flush_tlb_all();
 }
 
 static inline void pmd_clear(pmd_t *pmdp)
@@ -156,9 +163,16 @@ static inline unsigned long pte_pfn(pte_t pte)
 #define pte_page(x)     pfn_to_page(pte_pfn(x))
 
 /* Constructs a page table entry */
+extern phys_addr_t pa_msb;
 static inline pte_t pfn_pte(unsigned long pfn, pgprot_t prot)
 {
-	return __pte((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
+	pte_t ret;
+	if (pgprot_val(prot) & _PAGE_NONCACHEABLE) {
+		ret = __pte(((pfn|pa_msb) << _PAGE_PFN_SHIFT) | (pgprot_val(prot) & ~_PAGE_NONCACHEABLE));
+	} else {
+		ret = __pte((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
+	}
+	return ret;
 }
 
 static inline pte_t mk_pte(struct page *page, pgprot_t prot)
@@ -296,6 +310,7 @@ static inline int pte_same(pte_t pte_a, pte_t pte_b)
 static inline void set_pte(pte_t *ptep, pte_t pteval)
 {
 	*ptep = pteval;
+	local_flush_tlb_all();
 }
 
 void flush_icache_pte(pte_t pte);

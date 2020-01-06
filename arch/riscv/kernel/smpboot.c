@@ -31,12 +31,14 @@
 #include <linux/of.h>
 #include <linux/sched/task_stack.h>
 #include <linux/sched/hotplug.h>
+#include <linux/suspend.h>
 #include <asm/irq.h>
 #include <asm/mmu_context.h>
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
 #include <asm/sbi.h>
-
+#include <asm/andesv5/smu.h>
+#include <asm/andesv5/proc.h>
 void *__cpu_up_stack_pointer[NR_CPUS];
 void *__cpu_up_task_pointer[NR_CPUS];
 
@@ -82,7 +84,6 @@ int __cpu_up(unsigned int cpu, struct task_struct *tidle)
 	smp_mb();
 	__cpu_up_stack_pointer[cpu] = task_stack_page(tidle) + THREAD_SIZE;
 	__cpu_up_task_pointer[cpu] = tidle;
-
 	arch_send_call_function_single_ipi(cpu);
 	while (!cpu_online(cpu))
 		cpu_relax();
@@ -126,6 +127,7 @@ void __cpu_die(unsigned int cpu)
 /*
  * Called from the idle thread for the CPU which has been shutdown.
  */
+extern int suspend_begin;
 void cpu_play_dead(void)
 {
 	unsigned long sipval, sieval, scauseval;
@@ -135,6 +137,29 @@ void cpu_play_dead(void)
 
 	(void)cpu_report_death();
 
+#ifdef CONFIG_ATCSMU
+	if (suspend_begin == PM_SUSPEND_MEM) {
+		// Disable higher privilege's non-wakeup event
+		sbi_suspend_prepare(false, false);
+		// set SMU wakeup enable & MISC control
+		set_wakeup_enable(cpu, 1 << PCS_WAKE_MSIP_OFF);
+		// set SMU light sleep command
+		set_sleep(cpu, DeepSleep_CTL);
+		// backup, suspend and resume
+		sbi_suspend_mem();
+		// enable privilege
+		sbi_suspend_prepare(false, true);
+		goto exit_dead;
+	}
+	sbi_suspend_prepare(false, false);
+	set_wakeup_enable(cpu, 1 << PCS_WAKE_MSIP_OFF);
+	set_sleep(cpu, LightSleep_CTL);
+	cpu_dcache_disable(NULL);
+	wait_for_interrupt();
+	cpu_dcache_enable(NULL);
+	sbi_suspend_prepare(false, true);
+	goto exit_dead;
+#endif
 	/* Do not disable software interrupt to restart cpu after WFI */
 	csr_clear(sie, SIE_STIE | SIE_SEIE);
 
@@ -151,7 +176,7 @@ void cpu_play_dead(void)
 	/* only break if wfi returns for an enabled interrupt */
 	} while ((sipval & sieval) == 0 &&
 		 (scauseval & INTERRUPT_CAUSE_SOFTWARE) == 0);
-
+exit_dead:
 	boot_sec_cpu();
 }
 

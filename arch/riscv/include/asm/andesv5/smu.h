@@ -1,6 +1,7 @@
 #ifndef _ASM_RISCV_SMU_H
 #define _ASM_RISCV_SMU_H
 
+#include <asm/sbi.h>
 #define MAX_PCS_SLOT    7
 
 #define PCS0_WE_OFF     0x90
@@ -46,12 +47,30 @@
 #define PCS_CTL_PARAM_OFF       3
 #define SLEEP_CMD       3
 
+// wakeup events source offset
+#define PCS_WAKE_DBG_OFF	28
+#define PCS_WAKE_MSIP_OFF	29
+
+#define L2_CTL_OFF              0x8
+#define L2_COMMAND_OFF(cpu)     0x40 + 0x10 * cpu
+#define L2_STATUS_REG           0x80
+#define L2_WBINVAL_COMMAND      0x12
+
 extern unsigned int *wake_mask;
 extern void __iomem *l2c_base;
 
-void set_wakeup_enable(int cpu, unsigned int events, bool reset);
-void set_sleep(int cpu, unsigned char sleep, bool reset);
+void set_wakeup_enable(int cpu, unsigned int events);
+void set_sleep(int cpu, unsigned char sleep);
 void andes_suspend2standby(void);
 void andes_suspend2ram(void);
 
+static inline void sbi_suspend_prepare(char main_core, char enable)
+{
+	SBI_CALL_2(SBI_SUSPEND_PREPARE, main_core, enable);
+}
+
+static inline void sbi_suspend_mem(void)
+{
+	SBI_CALL_0(SBI_SUSPEND_MEM);
+}
 #endif

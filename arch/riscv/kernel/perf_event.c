@@ -62,7 +62,6 @@ typedef void (*perf_irq_t)(struct pt_regs *);
 perf_irq_t perf_irq = NULL;
 static cpumask_t pmu_cpu;
 static struct l2c_hw_events l2c_hw_events;
-static void __iomem *l2c_base;
 /*
  * Hardware & cache maps and their methods
  */
@@ -385,7 +384,7 @@ static void riscv_pmu_read(struct perf_event *event)
 	do {
 		prev_raw_count = local64_read(&hwc->prev_count);
 		if (is_l2c_event(hwc->config))
-			new_raw_count = l2c_read_counter(idx, l2c_base);
+			new_raw_count = l2c_read_counter(idx);
 		else
 			new_raw_count = read_counter(idx);
 
@@ -489,7 +488,7 @@ static int riscv_event_set_period(struct perf_event *event)
         local64_set(&hwc->prev_count, (u64)-left);
 
 	if (is_l2c_event(hwc->config))
-		l2c_write_counter(idx, (u64)(-left), l2c_base);
+		l2c_write_counter(idx, (u64)(-left));
 	else
 		write_counter(idx, (u64)(-left));
 
@@ -603,7 +602,7 @@ static void riscv_pmu_stop(struct perf_event *event, int flags)
 l2c_event_stop:
 	if (__test_and_clear_bit(idx, l2c->active_mask)) {
 		raw_spin_lock_irqsave(&l2c->pmu_lock, irq_flags);
-                l2c_pmu_disable_counter(hwc->idx, l2c_base);
+                l2c_pmu_disable_counter(hwc->idx);
 		raw_spin_unlock_irqrestore(&l2c->pmu_lock, irq_flags);
 
                 WARN_ON_ONCE(hwc->state & PERF_HES_STOPPED);
@@ -656,7 +655,7 @@ static void riscv_pmu_start(struct perf_event *event, int flags)
 	goto finish_start;
 l2c_event_start:
 	raw_spin_lock_irqsave(&l2c->pmu_lock, irq_flags);
-	l2c_pmu_disable_counter(idx, l2c_base);
+	l2c_pmu_disable_counter(idx);
 	raw_spin_unlock_irqrestore(&l2c->pmu_lock, irq_flags);
 
 	if (flags & PERF_EF_RELOAD) {
@@ -675,7 +674,7 @@ l2c_event_start:
 	__set_bit(idx, l2c->active_mask);
 
 	l2c_pmu_event_enable((event->hw.config >> EVSEL_OFF) & L2C_EVSEL_MASK,
-				idx, l2c_base);
+				idx);
 	raw_spin_unlock_irqrestore(&l2c->pmu_lock, irq_flags);
 finish_start:
 	perf_event_update_userpage(event);
@@ -1034,8 +1033,6 @@ int __init init_hw_perf_events(void)
 #elif defined CONFIG_RISCV_BASE_PMU
 	perf_pmu_register(riscv_pmu->pmu, "riscv-base", PERF_TYPE_RAW);
 #endif
-	node = of_find_compatible_node(NULL, NULL, "cache");
-	l2c_base = of_iomap(node, 0);
 
 	return 0;
 }

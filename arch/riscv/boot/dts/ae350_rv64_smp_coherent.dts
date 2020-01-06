@@ -121,10 +121,18 @@
     compatible = "fixed-clock";
     clock-frequency = <100000000>;
   };
-  
+
   smu: smu@f0100000 {
     compatible = "andestech,atcsmu";
     reg = <0x0 0xf0100000 0x0 0x1000>;
+  };
+
+  wdt0: wdt@f0500000 {
+    compatible = "andestech,atcwdt200";
+    interrupts = <0 4>;
+    reg = <0x0 0xf0500000 0x0 0x1000>;
+    clock-frequency = <15000000>;
+    interrupt-parent = <&plic0>;
   };
 
   timer0: timer@f0400000 {
@@ -284,5 +292,12 @@
       spi-cpol;
       spi-cpha;
     };
+  };
+
+  i2c: i2c@f0a00000 {
+    compatible = "andestech,atciic100";
+    reg = <0x0 0xf0a00000 0x0 0x1000>;
+    interrupts = <6 4>;
+    interrupt-parent = <&plic0>;
   };
 };

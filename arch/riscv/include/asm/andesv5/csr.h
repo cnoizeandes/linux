@@ -31,7 +31,15 @@
 #define CCTL_L1D_VA_WB		1
 #define CCTL_L1D_VA_WBINVAL	2
 
+/* L1 I-cache , D-cache */
+#define CACHE_CTL_offIC_EN  0   /* Enable I-cache */
+#define CACHE_CTL_offDC_EN  1   /* Enable D-cache */
+#define CACHE_CTL_mskIC_EN  ( 0x1  << CACHE_CTL_offIC_EN )
+#define CACHE_CTL_mskDC_EN  ( 0x1  << CACHE_CTL_offDC_EN )
+
+
 /* L2 cache */
+#define L2_CACHE_CTL_mskCEN 1
 /* L2 cache registers */
 #define L2C_REG_CFG_OFFSET	0
 #define L2C_REG_CTL_OFFSET	0x8
@@ -64,7 +72,7 @@
 #define CCTL_L2_PA_INVAL	0x8
 #define CCTL_L2_PA_WB		0x9
 #define CCTL_L2_PA_WBINVAL	0xA
-#define CCTL_L2_FENCE		0x12
+#define CCTL_L2_WBINVAL_ALL	0x12
 
 #define L2C_HPM_PER_CORE_OFFSET		0x8
 #define L2C_REG_PER_CORE_OFFSET		0x10

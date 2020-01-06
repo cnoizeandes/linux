@@ -51,6 +51,7 @@ config RISCV
 	select MODULE_SECTIONS if MODULES
 	select GENERIC_STRNCPY_FROM_USER if KASAN
 	select HAVE_ARCH_KASAN if MMU
+	select SWIOTLB
 
 config CPU_FREQ
 	def_bool y
@@ -148,7 +149,6 @@ config ARCH_RV64I
 	select HAVE_FTRACE_MCOUNT_RECORD
 	select HAVE_DYNAMIC_FTRACE
 	select HAVE_DYNAMIC_FTRACE_WITH_REGS
-	select SWIOTLB
 
 endchoice
 
@@ -242,12 +242,6 @@ config ANDES_PMU
 	help
 	  Andes PMU provide extension registers for Performance counter.
 endchoice
-
-config ATCSMU
-	bool "SMU support"
-	default y
-	help
-	 Say N here if you want to disable SMU support
 
 config DSP
        bool "DSP support"
