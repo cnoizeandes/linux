@@ -154,6 +154,13 @@
     interrupt-parent = <&plic0>;
   };
 
+  gpio0: gpio@f0700000 {
+    compatible = "andestech,atcgpio100";
+    reg = <0x0 0xf0700000 0x0 0x00001000>;
+    interrupts = <7 4>;
+    interrupt-parent = <0x2>;
+  };
+
   rtc0: rtc@f0600000 {
     compatible = "andestech,atcrtc100";
     reg = <0xf0600000 0x1000>;
