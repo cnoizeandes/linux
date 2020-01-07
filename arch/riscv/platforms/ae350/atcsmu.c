@@ -11,13 +11,7 @@
 #include <asm/andesv5/smu.h>
 #include <asm/andesv5/proc.h>
 
-struct atc_smu {
-        void __iomem *base;
-        struct resource *res;
-        spinlock_t lock;
-};
 struct atc_smu atcsmu;
-
 int get_pd_type(unsigned int cpu)
 {
 	struct atc_smu *smu = &atcsmu;
