@@ -29,6 +29,10 @@
 #define GET_PD_TYPE(val)        val & PD_TYPE_MASK
 #define GET_PD_STATUS(val)      (val & PD_STATUS_MASK) >> 3
 
+#define RESET_VEC_OFF           0x50
+#define RESET_VEC_PER_CORE      0x4
+#define FLASH_BASE              0x80000000
+
 // PD_type
 #define ACTIVE  0
 #define RESET   1
@@ -55,6 +59,12 @@
 #define L2_COMMAND_OFF(cpu)     0x40 + 0x10 * cpu
 #define L2_STATUS_REG           0x80
 #define L2_WBINVAL_COMMAND      0x12
+
+struct atc_smu {
+        void __iomem *base;
+        struct resource *res;
+        spinlock_t lock;
+};
 
 extern unsigned int *wake_mask;
 extern void __iomem *l2c_base;

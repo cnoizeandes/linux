@@ -28,6 +28,8 @@
 #include <linux/cpumask.h>
 #include <asm/processor.h>
 #include <asm/sbi.h>
+#include <asm/andesv5/smu.h>
+
 #define DRIVER_NAME	"atcwdt200"
 #define DEBUG( str, ...)			\
 	do{					\
@@ -214,6 +216,30 @@ static long wdtdog_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 }
 
+extern struct atc_smu atcsmu;
+static int atcwdt200_restart_call(struct notifier_block *nb,
+                                  unsigned long action, void *data)
+{
+	int i;
+	int cpu_num = num_online_cpus();
+
+	if (atcsmu.base <= 0)
+		pr_err("Need to add smu node to dts!!\n");
+
+	for (i = 0; i < cpu_num; i++)
+		writel(FLASH_BASE ,atcsmu.base + RESET_VEC_OFF +
+			i * RESET_VEC_PER_CORE);
+
+	wren = WP_MAGIC;
+	ctrl = (INT_CLK_32768|INT_EN|RST_CLK_128|RST_EN|WDT_EN);
+        return 0;
+}
+
+static struct notifier_block atcwdt200_restart = {
+        .notifier_call = atcwdt200_restart_call,
+        .priority = 255,
+};
+
 static struct file_operations wdtdog_fops = {
 	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
@@ -257,6 +283,8 @@ static int atcwdt200_dog_probe(struct platform_device *pdev){
 	ret = misc_register(&atcwdt200_dog_miscdev);
 	if( ret)
 		return ret;
+
+	register_restart_handler(&atcwdt200_restart);
 
 	DEBUG("ATCWDT200 watchdog timer: timer timeout %d sec\n", timeout);
 	return 0;
