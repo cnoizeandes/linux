@@ -224,7 +224,7 @@ static int atc_rtc_probe(struct platform_device *pdev)
 
 	spin_lock_init(&rtc->lock);
 
-	rtc->alarm_irq = platform_get_irq(pdev, 2);
+	rtc->alarm_irq = platform_get_irq(pdev, 1);
 	if (rtc->alarm_irq < 0)
 		goto err_exit;
 
