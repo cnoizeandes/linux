@@ -7,7 +7,6 @@
 #define _ASM_RISCV_PGTABLE_H
 
 #include <linux/mmzone.h>
-#include <linux/sizes.h>
 
 #include <asm/pgtable-bits.h>
 
@@ -87,7 +86,6 @@ extern pgd_t swapper_pg_dir[];
 #define VMALLOC_SIZE     (KERN_VIRT_SIZE >> 1)
 #define VMALLOC_END      (PAGE_OFFSET - 1)
 #define VMALLOC_START    (PAGE_OFFSET - VMALLOC_SIZE)
-#define PCI_IO_SIZE      SZ_16M
 
 /*
  * Roughly size the vmemmap space to be large enough to fit enough
@@ -102,16 +100,19 @@ extern pgd_t swapper_pg_dir[];
 
 #define vmemmap		((struct page *)VMEMMAP_START)
 
-#define PCI_IO_END       VMEMMAP_START
-#define PCI_IO_START     (PCI_IO_END - PCI_IO_SIZE)
-#define FIXADDR_TOP      PCI_IO_START
-
+#define FIXADDR_TOP      (VMEMMAP_START)
 #ifdef CONFIG_64BIT
 #define FIXADDR_SIZE     PMD_SIZE
 #else
 #define FIXADDR_SIZE     PGDIR_SIZE
 #endif
 #define FIXADDR_START    (FIXADDR_TOP - FIXADDR_SIZE)
+
+#define pgprot_noncached pgprot_noncached
+static inline pgprot_t pgprot_noncached(pgprot_t _prot)
+{
+       return __pgprot(pgprot_val(_prot) | _PAGE_NONCACHEABLE);
+}
 
 /*
  * ZERO_PAGE is a global shared page that is always zero,
@@ -138,6 +139,7 @@ static inline int pmd_bad(pmd_t pmd)
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
 	*pmdp = pmd;
+	local_flush_tlb_all();
 }
 
 static inline void pmd_clear(pmd_t *pmdp)
@@ -184,9 +186,16 @@ static inline unsigned long pte_pfn(pte_t pte)
 #define pte_page(x)     pfn_to_page(pte_pfn(x))
 
 /* Constructs a page table entry */
+extern phys_addr_t pa_msb;
 static inline pte_t pfn_pte(unsigned long pfn, pgprot_t prot)
 {
-	return __pte((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
+	pte_t ret;
+	if (pgprot_val(prot) & _PAGE_NONCACHEABLE) {
+		ret = __pte(((pfn|pa_msb) << _PAGE_PFN_SHIFT) | (pgprot_val(prot) & ~_PAGE_NONCACHEABLE));
+	} else {
+		ret = __pte((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
+	}
+	return ret;
 }
 
 #define mk_pte(page, prot)       pfn_pte(page_to_pfn(page), prot)
@@ -326,6 +335,7 @@ static inline int pte_same(pte_t pte_a, pte_t pte_b)
 static inline void set_pte(pte_t *ptep, pte_t pteval)
 {
 	*ptep = pteval;
+	local_flush_tlb_all();
 }
 
 void flush_icache_pte(pte_t pte);

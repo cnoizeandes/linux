@@ -528,9 +528,9 @@ static dma_addr_t ftmac100_txdes_get_dma_addr(struct ftmac100_txdes *txdes)
 	return le32_to_cpu(txdes->txdes2);
 }
 
-static void ftmac100_txdes_skb_reset(struct ftmac100 *priv, int index)
+static void ftmac100_txdes_skb_reset(struct ftmac100_txdes *txdes)
 {
-	FTMAC100_TX_DESC_EXT(priv, index)->skb = NULL;
+	txdes->txdes3 = 0;
 }
 
 /*
@@ -609,7 +609,7 @@ static bool ftmac100_tx_complete_packet(struct ftmac100 *priv)
 	dev_kfree_skb(skb);
 
 	ftmac100_txdes_reset(txdes);
-	ftmac100_txdes_skb_reset(priv, index);
+	ftmac100_txdes_skb_reset(txdes);
 
 	ftmac100_tx_clean_pointer_advance(priv);
 

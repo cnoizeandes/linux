@@ -20,7 +20,13 @@
 
 #ifdef CONFIG_RISCV_BASE_PMU
 #define RISCV_MAX_COUNTERS	2
+#elif defined CONFIG_ANDES_PMU
+#define RISCV_MAX_COUNTERS      7
 #endif
+
+#define L2C_MAX_COUNTERS    32
+#define BASE_COUNTERS   3
+
 
 #ifndef RISCV_MAX_COUNTERS
 #error "Please provide a valid RISCV_MAX_COUNTERS for the PMU."

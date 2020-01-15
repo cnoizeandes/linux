@@ -37,6 +37,13 @@ struct screen_info screen_info = {
 };
 #endif
 
+phys_addr_t pa_msb;
+asmlinkage void __init setup_maxpa(void)
+{
+    csr_write(satp, SATP_PPN);
+    pa_msb = (csr_read(satp) + 1) >>1;
+}
+
 /* The lucky hart to first increment this variable will boot the other cores */
 atomic_t hart_lottery;
 unsigned long boot_cpu_hartid;

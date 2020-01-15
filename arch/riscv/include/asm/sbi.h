@@ -17,6 +17,17 @@
 #define SBI_REMOTE_SFENCE_VMA 6
 #define SBI_REMOTE_SFENCE_VMA_ASID 7
 #define SBI_SHUTDOWN 8
+#define SBI_TRIGGER 9
+#define SBI_SET_PFM 10
+#define SBI_READ_POWERBRAKE 11
+#define SBI_WRITE_POWERBRAKE 12
+#define SBI_SUSPEND_PREPARE 13
+#define SBI_SUSPEND_MEM 14
+#define SBI_DCACHE_OP 15
+#define SBI_ICACHE_OP 16
+#define SBI_L1CACHE_STATUS 17
+#define SBI_RESTART 18
+#define SBI_SET_RESET_VEC 19
 
 #define SBI_CALL(which, arg0, arg1, arg2, arg3) ({		\
 	register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);	\
