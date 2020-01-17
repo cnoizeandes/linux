@@ -25,6 +25,7 @@
 #include <asm/page.h>
 #include <asm/tlbflush.h>
 #include <linux/mm_types.h>
+#include <linux/sizes.h>
 
 #ifdef CONFIG_64BIT
 #include <asm/pgtable-64.h>
@@ -143,6 +144,10 @@ static inline pgd_t *pgd_offset(const struct mm_struct *mm, unsigned long addr)
 }
 /* Locate an entry in the kernel page global directory */
 #define pgd_offset_k(addr)      pgd_offset(&init_mm, (addr))
+
+/* Locate an entry in the second-level page table */
+#define pmd_offset(dir, addr)   ((pmd_t *)(dir))
+#define pmd_off_k(address)  pmd_offset(pgd_offset_k(address), address)
 
 static inline struct page *pmd_page(pmd_t pmd)
 {
@@ -426,9 +431,20 @@ static inline void pgtable_cache_init(void)
 	/* No page table caches to initialize */
 }
 
+#ifdef CONFIG_HIGHMEM
+#define VMALLOC_SIZE     (SZ_128M)
+#define VMALLOC_END      (0xfff00000UL) /*Reserved 1023K from FFFF_FFFFF*/
+#define VMALLOC_START    (VMALLOC_END - VMALLOC_SIZE)
+
+#include <asm/fixmap.h>
+#define LOWMEM_END			(ALIGN_DOWN(FIXADDR_START, SZ_4M))
+#define LOWMEM_SIZE			(LOWMEM_END - PAGE_OFFSET)
+#define LOWMEM_END_PFN		(PFN_DOWN(__pa(LOWMEM_END)))
+#else
 #define VMALLOC_SIZE     (KERN_VIRT_SIZE >> 1)
 #define VMALLOC_END      (PAGE_OFFSET - 1)
 #define VMALLOC_START    (PAGE_OFFSET - VMALLOC_SIZE)
+#endif
 
 /*
  * Task size is 0x40000000000 for RV64 or 0xb800000 for RV32.
@@ -437,7 +453,11 @@ static inline void pgtable_cache_init(void)
 #ifdef CONFIG_64BIT
 #define TASK_SIZE (PGDIR_SIZE * PTRS_PER_PGD / 2)
 #else
+#ifdef CONFIG_HIGHMEM
+#define TASK_SIZE UL(CONFIG_PAGE_OFFSET)
+#else
 #define TASK_SIZE VMALLOC_START
+#endif
 #endif
 
 #include <asm-generic/pgtable.h>

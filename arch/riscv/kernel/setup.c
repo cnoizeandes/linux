@@ -22,6 +22,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/memblock.h>
+#include <linux/bootmem.h>
 #include <linux/sched.h>
 #include <linux/initrd.h>
 #include <linux/console.h>
@@ -147,6 +148,9 @@ asmlinkage void __init setup_vm(void)
 	/* Sanity check alignment and size */
 	BUG_ON((PAGE_OFFSET % PGDIR_SIZE) != 0);
 	BUG_ON((pa % (PAGE_SIZE * PTRS_PER_PTE)) != 0);
+#ifdef CONFIG_HIGHMEM
+	BUG_ON((LOWMEM_SIZE % PGDIR_SIZE) != 0);
+#endif
 
 #ifndef __PAGETABLE_PMD_FOLDED
 	trampoline_pg_dir[(PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD] =
@@ -154,7 +158,11 @@ asmlinkage void __init setup_vm(void)
 			__pgprot(_PAGE_TABLE));
 	trampoline_pmd[0] = pfn_pmd(PFN_DOWN(pa), prot);
 
+#ifndef CONFIG_HIGHMEM
 	for (i = 0; i < (-PAGE_OFFSET)/PGDIR_SIZE; ++i) {
+#else
+	for (i = 0; i < (LOWMEM_SIZE)/PGDIR_SIZE; ++i) {
+#endif
 		size_t o = (PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD + i;
 
 		swapper_pg_dir[o] =
@@ -166,8 +174,11 @@ asmlinkage void __init setup_vm(void)
 #else
 	trampoline_pg_dir[(PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD] =
 		pfn_pgd(PFN_DOWN(pa), prot);
-
+#ifndef CONFIG_HIGHMEM
 	for (i = 0; i < (-PAGE_OFFSET)/PGDIR_SIZE; ++i) {
+#else
+	for (i = 0; i < (LOWMEM_SIZE)/PGDIR_SIZE; ++i) {
+#endif
 		size_t o = (PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD + i;
 		swapper_pg_dir[o] =
 			pfn_pgd(PFN_DOWN(pa + i * PGDIR_SIZE), prot);
@@ -196,14 +207,23 @@ static void __init setup_bootmem(void)
 			 * the kernel
 			 */
 			memblock_reserve(reg->base, vmlinux_end - reg->base);
+#ifdef CONFIG_HIGHMEM
+			mem_size = reg->size;
+#else
 			mem_size = min(reg->size, (phys_addr_t)-PAGE_OFFSET);
+#endif
 		}
 	}
 	BUG_ON(mem_size == 0);
 
 	set_max_mapnr(PFN_DOWN(mem_size));
+#ifdef CONFIG_HIGHMEM
+	max_low_pfn = LOWMEM_END_PFN ;
+	 max_pfn	= PFN_DOWN(memblock_end_of_DRAM());
+	 memblock_set_current_limit(__pa(LOWMEM_END));
+#else
 	max_low_pfn = PFN_DOWN(memblock_end_of_DRAM());
-
+#endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	setup_initrd();
 #endif /* CONFIG_BLK_DEV_INITRD */

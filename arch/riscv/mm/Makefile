@@ -4,6 +4,7 @@ obj-y += extable.o
 obj-y += ioremap.o
 obj-y += cacheflush.o
 obj-y += dma-mapping.o
+obj-$(CONFIG_HIGHMEM) += highmem.o
 obj-$(CONFIG_KASAN)   += kasan_init.o
 KASAN_SANITIZE_fault.o := n
 KASAN_SANITIZE_kasan_init.o := n
