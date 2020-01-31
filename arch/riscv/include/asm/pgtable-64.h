@@ -54,7 +54,7 @@ static inline int pud_bad(pud_t pud)
 static inline void set_pud(pud_t *pudp, pud_t pud)
 {
 	*pudp = pud;
-	local_flush_tlb_all();
+	flush_tlb_all();
 }
 
 static inline void pud_clear(pud_t *pudp)

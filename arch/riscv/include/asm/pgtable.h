@@ -120,7 +120,7 @@ static inline int pmd_bad(pmd_t pmd)
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
 	*pmdp = pmd;
-	local_flush_tlb_all();
+	flush_tlb_all();
 }
 
 static inline void pmd_clear(pmd_t *pmdp)
@@ -310,7 +310,7 @@ static inline int pte_same(pte_t pte_a, pte_t pte_b)
 static inline void set_pte(pte_t *ptep, pte_t pteval)
 {
 	*ptep = pteval;
-	local_flush_tlb_all();
+	flush_tlb_all();
 }
 
 void flush_icache_pte(pte_t pte);
