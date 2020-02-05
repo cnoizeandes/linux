@@ -90,7 +90,9 @@ futex_cmp_requeue(u_int32_t *uaddr, u_int32_t val, u_int32_t *uaddr2, int nr_wak
 #ifndef HAVE_PTHREAD_ATTR_SETAFFINITY_NP
 #include <pthread.h>
 #include <linux/compiler.h>
-static inline int pthread_attr_setaffinity_np(pthread_attr_t *attr __maybe_unused,
+// FIXME : This is a quick workaround for mismatching function prototype during
+//         perf build ing procedure.
+int pthread_attr_setaffinity_np(pthread_attr_t *attr __maybe_unused,
 					      size_t cpusetsize __maybe_unused,
 					      cpu_set_t *cpuset __maybe_unused)
 {
