@@ -53,10 +53,12 @@ static inline void flush_icache_page(struct vm_area_struct *vma,
 
 static inline void flush_cache_vmap(unsigned long start, unsigned long end)
 {
+	local_flush_tlb_all();
 }
 
 static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
 {
+	local_flush_tlb_all();
 }
 
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
