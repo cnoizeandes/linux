@@ -204,8 +204,8 @@ static int atcsmu_probe(struct platform_device *pdev)
 
 	ret = -EINVAL;
 
-	smu->base = ioremap_nocache(smu->res->start,
-					smu->res->end - smu->res->start + 1);
+	smu->base = ioremap(smu->res->start,
+			    smu->res->end - smu->res->start + 1);
 	if (!smu->base)
 		goto err_ioremap;
 
