@@ -259,7 +259,7 @@ config FPU
 
 config HIGHMEM
     bool "High Memory Support"
-	default y if 32BIT
+	default n
     help
       The address space of Andes A25MP processors is only 4 Gigabytes large
       and it has to accommodate user address space, kernel address
