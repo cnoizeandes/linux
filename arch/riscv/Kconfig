@@ -274,6 +274,10 @@ config HIGHMEM
 
       If unsure, say n.
 
+config PMA
+	bool "PMA support"
+	help
+	  Say N here if bitmap don't have PMA support.
 endmenu
 
 menu "Kernel type"

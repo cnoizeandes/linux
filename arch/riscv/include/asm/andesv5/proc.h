@@ -16,7 +16,11 @@ void cpu_l2c_wb_range(unsigned long pa, unsigned long size);
 
 extern phys_addr_t pa_msb;;
 
+#ifdef CONFIG_PMA
+#define dma_remap(pa, size) ioremap_nocache(pa, size)
+#else
 #define dma_remap(pa, size) ioremap((pa|(pa_msb << PAGE_SHIFT)), size)
+#endif
 
 #define dma_unmap(vaddr) iounmap((void __force __iomem *)vaddr)
 

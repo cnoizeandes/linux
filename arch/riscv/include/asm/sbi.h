@@ -36,6 +36,8 @@
 #define SBI_L1CACHE_STATUS 17
 #define SBI_RESTART 18
 #define SBI_SET_RESET_VEC 19
+#define SBI_SET_PMA 20
+#define SBI_FREE_PMA 21
 
 #define SBI_CALL(which, arg0, arg1, arg2) ({			\
 	register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);	\
@@ -54,6 +56,17 @@
 #define SBI_CALL_1(which, arg0) SBI_CALL(which, arg0, 0, 0)
 #define SBI_CALL_2(which, arg0, arg1) SBI_CALL(which, arg0, arg1, 0)
 #define SBI_CALL_3(which, arg0, arg1, arg2) SBI_CALL(which, arg0, arg1, arg2)
+
+static inline void sbi_set_pma(phys_addr_t offset, unsigned long vaddr,
+			       size_t size)
+{
+	SBI_CALL_3(SBI_SET_PMA, offset, vaddr, size);
+}
+
+static inline void sbi_free_pma(unsigned long vaddr)
+{
+	SBI_CALL_1(SBI_FREE_PMA, vaddr);
+}
 
 static inline void sbi_set_reset_vec(int val)
 {

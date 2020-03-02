@@ -175,7 +175,11 @@ static inline pte_t pfn_pte(unsigned long pfn, pgprot_t prot)
 {
 	pte_t ret;
 	if (pgprot_val(prot) & _PAGE_NONCACHEABLE) {
+#ifdef CONFIG_PMA
+		ret = __pte((pfn << _PAGE_PFN_SHIFT) | (pgprot_val(prot) & ~_PAGE_NONCACHEABLE));
+#else
 		ret = __pte(((pfn|pa_msb) << _PAGE_PFN_SHIFT) | (pgprot_val(prot) & ~_PAGE_NONCACHEABLE));
+#endif
 	} else {
 		ret = __pte((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
 	}
