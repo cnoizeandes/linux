@@ -23,6 +23,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/dma-direct.h>
 #include <linux/scatterlist.h>
+#include <linux/highmem.h>
 #include <asm/andesv5/proc.h>
 
 static void dma_flush_page(struct page *page, size_t size)
@@ -43,10 +44,37 @@ static void dma_flush_page(struct page *page, size_t size)
 static inline void cache_op(phys_addr_t paddr, size_t size,
 		void (*fn)(unsigned long start, unsigned long end))
 {
-	unsigned long start;
+    struct page *page = pfn_to_page(paddr >> PAGE_SHIFT);
+    unsigned offset = paddr & ~PAGE_MASK;
+    size_t left = size;
+    unsigned long start;
 
-	start = (unsigned long)phys_to_virt(paddr);
-	fn(start, start + size);
+    do {
+        size_t len = left;
+
+        if (PageHighMem(page)) {
+            void *addr;
+
+            if (offset + len > PAGE_SIZE) {
+                if (offset >= PAGE_SIZE) {
+                    page += offset >> PAGE_SHIFT;
+                    offset &= ~PAGE_MASK;
+                }
+                len = PAGE_SIZE - offset;
+            }
+
+            addr = kmap_atomic(page);
+            start = (unsigned long)(addr + offset);
+            fn(start, start + len);
+            kunmap_atomic(addr);
+        } else {
+            start = (unsigned long)phys_to_virt(paddr);
+            fn(start, start + size);
+        }
+        offset = 0;
+        page++;
+        left -= len;
+    } while (left);
 }
 
 void arch_sync_dma_for_device(struct device *dev, phys_addr_t paddr,
