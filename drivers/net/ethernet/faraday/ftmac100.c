@@ -931,7 +931,7 @@ static int ftmac100_poll(struct napi_struct *napi, int budget)
 		ftmac100_tx_complete(priv);
 	}
 
-	if (status & (FTMAC100_INT_NORXBUF | FTMAC100_INT_RPKT_LOST |
+	if (status & (FTMAC100_INT_NORXBUF |
 		      FTMAC100_INT_AHB_ERR | FTMAC100_INT_PHYSTS_CHG)) {
 		if (net_ratelimit())
 			netdev_info(netdev, "[ISR] = 0x%x: %s%s%s%s\n", status,
