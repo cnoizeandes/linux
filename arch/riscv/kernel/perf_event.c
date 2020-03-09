@@ -847,6 +847,8 @@ static void riscv_event_destroy(struct perf_event *event)
 		release_pmc_hardware();
 }
 
+extern void __iomem *l2c_base;
+
 static int riscv_event_init(struct perf_event *event)
 {
 	struct perf_event_attr *attr = &event->attr;
@@ -877,6 +879,9 @@ static int riscv_event_init(struct perf_event *event)
 			return -EBUSY;
 		}
 	}
+
+	if ((code >> L2C_MARK_OFF) == L2C_EVSEL_MASK && !l2c_base)
+		code = -EINVAL;
 
 	event->destroy = riscv_event_destroy;
 	if (code < 0) {
