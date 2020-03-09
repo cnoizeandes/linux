@@ -21,7 +21,7 @@
 #define SEL_PER_CTL	8
 #define SEL_OFF(id)	(8 * (id % 8))
 
-static void __iomem *l2c_base;
+void __iomem *l2c_base;
 
 DEFINE_PER_CPU(struct andesv5_cache_info, cpu_cache_info) = {
 	.init_done = 0,
