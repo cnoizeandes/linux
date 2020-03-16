@@ -49,14 +49,14 @@ static int riscv_pm_enter(suspend_state_t state)
 #else
 		riscv_suspend_cpu();
 #endif
-		return 1;
+		return 0;
 	case PM_SUSPEND_MEM:
 #ifdef CONFIG_ATCSMU
 		andes_suspend2ram();
 #else
 		riscv_suspend2ram();
 #endif
-		return 1;
+		return 0;
 	default:
 		return -EINVAL;
 	}
