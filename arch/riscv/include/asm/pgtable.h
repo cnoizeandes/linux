@@ -83,10 +83,16 @@ extern pgd_t swapper_pg_dir[];
 #define __S110	PAGE_SHARED_EXEC
 #define __S111	PAGE_SHARED_EXEC
 
+#ifdef CONFIG_HIGHMEM
+#define VMALLOC_SIZE     (SZ_128M)
+/*Reserved 1023K from RAM TOP*/
+#define VMALLOC_END      (0xfff00000UL)
+#define VMALLOC_START    (VMALLOC_END - VMALLOC_SIZE)
+#else
 #define VMALLOC_SIZE     (KERN_VIRT_SIZE >> 1)
 #define VMALLOC_END      (PAGE_OFFSET - 1)
 #define VMALLOC_START    (PAGE_OFFSET - VMALLOC_SIZE)
-
+#endif
 /*
  * Roughly size the vmemmap space to be large enough to fit enough
  * struct pages to map half the virtual address space. Then
@@ -100,13 +106,11 @@ extern pgd_t swapper_pg_dir[];
 
 #define vmemmap		((struct page *)VMEMMAP_START)
 
-#define FIXADDR_TOP      (VMEMMAP_START)
-#ifdef CONFIG_64BIT
-#define FIXADDR_SIZE     PMD_SIZE
-#else
-#define FIXADDR_SIZE     PGDIR_SIZE
+#ifdef CONFIG_HIGHMEM
+/* Set LOWMEM_END alignment with PGDIR_SIZE */
+#define LOWMEM_END		 (ALIGN_DOWN(PKMAP_BASE, SZ_4M))
+#define LOWMEM_SIZE		 (LOWMEM_END - PAGE_OFFSET)
 #endif
-#define FIXADDR_START    (FIXADDR_TOP - FIXADDR_SIZE)
 
 #define pgprot_noncached pgprot_noncached
 static inline pgprot_t pgprot_noncached(pgprot_t _prot)
@@ -166,6 +170,11 @@ static inline pgd_t *pgd_offset(const struct mm_struct *mm, unsigned long addr)
 }
 /* Locate an entry in the kernel page global directory */
 #define pgd_offset_k(addr)      pgd_offset(&init_mm, (addr))
+
+#ifdef CONFIG_HIGHMEM
+/* Locate an entry in the second-level page table */
+#define pmd_off_k(address)  pmd_offset((pud_t *)pgd_offset_k(address), address)
+#endif
 
 static inline struct page *pmd_page(pmd_t pmd)
 {
@@ -453,7 +462,12 @@ extern void paging_init(void);
 #ifdef CONFIG_64BIT
 #define TASK_SIZE (PGDIR_SIZE * PTRS_PER_PGD / 2)
 #else
+#ifdef CONFIG_HIGHMEM
+#define TASK_SIZE PAGE_OFFSET
+#else
+#include<asm/fixmap.h>
 #define TASK_SIZE FIXADDR_START
+#endif
 #endif
 
 #include <asm-generic/pgtable.h>

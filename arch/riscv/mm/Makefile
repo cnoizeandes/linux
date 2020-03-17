@@ -13,6 +13,7 @@ obj-y += cacheflush.o
 obj-y += dma-mapping.o
 obj-y += context.o
 obj-y += sifive_l2_cache.o
+obj-$(CONFIG_HIGHMEM) += highmem.o
 
 ifeq ($(CONFIG_MMU),y)
 obj-$(CONFIG_SMP) += tlbflush.o
