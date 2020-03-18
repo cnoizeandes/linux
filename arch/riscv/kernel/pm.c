@@ -8,7 +8,7 @@
 #include <linux/suspend.h>
 
 extern unsigned int *wake_mask;
-extern void __iomem *plic_base;
+extern void __iomem *plic_regs;
 #define PLIC_PEND_BASE	0x1000
 #define MAX_DEVICES 1024
 
@@ -16,7 +16,7 @@ static void riscv_suspend_cpu(void)
 {
 	int i;
 	unsigned int wake;
-	u32 __iomem *reg = plic_base + PLIC_PEND_BASE;
+	u32 __iomem *reg = plic_regs + PLIC_PEND_BASE;
 
 	while (true) {
 		__asm__ volatile ("wfi\n\t");

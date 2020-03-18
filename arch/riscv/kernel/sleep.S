@@ -43,7 +43,7 @@ suspend2ram:
 	/* waiting for wake up source device to wake up */
 
 	// get pending vector $t0
-	la t0, plic_base
+	la t0, plic_regs
 #if __riscv_xlen == 64
 	ld t0, 0(t0)
 #else

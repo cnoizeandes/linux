@@ -56,7 +56,7 @@
 #define     CONTEXT_THRESHOLD		0x00
 #define     CONTEXT_CLAIM		0x04
 
-static void __iomem *plic_regs;
+void __iomem *plic_regs;
 unsigned int *wake_mask;
 unsigned int *orig;
 
@@ -116,10 +116,9 @@ static void plic_irq_mask(struct irq_data *d)
 
 static int plic_set_wake(struct irq_data *d, unsigned int on)
 {
-	struct plic_data *data = irq_data_get_irq_chip_data(d);
 	u32 bit[MAX_USE_REGS];
 	u32 offset = d->hwirq / 32;
-	int i;
+	int i,cpu;
 
 	bit[offset] = 1 << (d->hwirq % 32);
 
@@ -128,12 +127,13 @@ static int plic_set_wake(struct irq_data *d, unsigned int on)
 	else
 		__assign_bit(d->hwirq, (unsigned long *)wake_mask, false);
 
-	for(i = 0; i < data->handlers; ++i) {
-		if (data->handler[i].present) {
+
+	for_each_cpu(cpu, cpu_possible_mask) {
+		struct plic_handler *handler = per_cpu_ptr(&plic_handlers, cpu);
+
+		if (handler->present){
 			unsigned int int_mask[MAX_USE_REGS];
-			u32 __iomem *reg = plic_enable_vector(data,
-			data->handler[i].contextid)
-			+ offset;
+			u32 __iomem *reg = handler->enable_base + (d->hwirq / 32) * sizeof(u32);
 			u32 target_area = i * (MAX_USE_REGS);
 
 			int_mask[offset] = readl(reg);
@@ -158,6 +158,7 @@ static int plic_set_wake(struct irq_data *d, unsigned int on)
 			}
 			writel(int_mask[offset], reg);
 		}
+			
 	}
 	return 0;
 }
@@ -296,7 +297,7 @@ static int __init plic_init(struct device_node *node,
 	if (WARN_ON(!wake_mask))
 		return -ENOMEM;
 
-	orig = kzalloc(data->handlers * (MAX_USE_REGS) * sizeof(u32), GFP_KERNEL);
+	orig = kzalloc(nr_contexts * (MAX_USE_REGS) * sizeof(u32), GFP_KERNEL);
 	if (WARN_ON(!orig))
 		return -ENOMEM;
 
