@@ -21,6 +21,7 @@
 #include <asm/sections.h>
 #include <asm/pgtable.h>
 #include <asm/smp.h>
+#include <asm/sbi.h>
 #include <asm/tlbflush.h>
 #include <asm/thread_info.h>
 
@@ -78,6 +79,14 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_SWIOTLB
 	swiotlb_init(1);
+#endif
+
+#ifdef CONFIG_KASAN
+	kasan_init();
+#endif
+
+#if IS_ENABLED(CONFIG_RISCV_SBI)
+	sbi_init();
 #endif
 
 #ifdef CONFIG_SMP
