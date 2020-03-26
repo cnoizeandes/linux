@@ -140,7 +140,6 @@ void __init smp_cpus_done(unsigned int max_cpus)
 int __cpu_disable(void)
 {
 	unsigned int cpu = smp_processor_id();
-	int ret;
 
 	set_cpu_online(cpu, false);
 	irq_migrate_all_off_this_cpu();
@@ -153,8 +152,6 @@ int __cpu_disable(void)
  */
 void __cpu_die(unsigned int cpu)
 {
-	int err = 0;
-
 	if (!cpu_wait_death(cpu, 5)) {
 		pr_err("CPU %u: didn't die\n", cpu);
 		return;
@@ -175,7 +172,7 @@ void cpu_play_dead(void)
 	(void)cpu_report_death();
 
 	/* Do not disable software interrupt to restart cpu after WFI */
-	csr_clear(sie, SIE_STIE | SIE_SEIE);
+	csr_clear(CSR_SIE, SIE_STIE | SIE_SEIE);
 
 	/* clear all pending flags */
 	csr_write(sip, 0);
@@ -184,23 +181,21 @@ void cpu_play_dead(void)
 
 	do {
 		wait_for_interrupt();
-		sipval = csr_read(sip);
-		sieval = csr_read(sie);
+		sipval = csr_read(CSR_SIP);
+		sieval = csr_read(CSR_SIE);
 		scauseval = csr_read(scause);
 	/* only break if wfi returns for an enabled interrupt */
 	} while ((sipval & sieval) == 0 &&
-		 (scauseval & INTERRUPT_CAUSE_SOFTWARE) == 0);
+		 (scauseval & IRQ_S_SOFT) == 0);
 exit_dead:
 	boot_sec_cpu();
 }
-
-
 #endif
 
 /*
  * C entry point for a secondary processor.
  */
-asmlinkage __visible void __init smp_callin(void)
+asmlinkage __visible void smp_callin(void)
 {
 	struct mm_struct *mm = &init_mm;
 
