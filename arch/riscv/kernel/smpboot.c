@@ -115,17 +115,19 @@ int __cpu_up(unsigned int cpu, struct task_struct *tidle)
 		  task_stack_page(tidle) + THREAD_SIZE);
 	WRITE_ONCE(__cpu_up_task_pointer[hartid], tidle);
 
+	arch_send_call_function_single_ipi(cpu);
+
 	lockdep_assert_held(&cpu_running);
 	wait_for_completion_timeout(&cpu_running,
 					    msecs_to_jiffies(1000));
 
-	arch_send_call_function_single_ipi(cpu);
 	if (!cpu_online(cpu)) {
 		pr_crit("CPU%u: failed to come online\n", cpu);
 		ret = -EIO;
+	}else{
+		pr_notice("CPU%u: online\n", cpu);
 	}
 
-	pr_notice("CPU%u: online\n", cpu);
 	return ret;
 }
 
