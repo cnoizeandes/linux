@@ -5,9 +5,9 @@
 #include <asm/asm-offsets.h>
 #include <asm/csr.h>
 .text
-.global suspend2ram
+.global riscv_suspend2ram
 
-suspend2ram:
+riscv_suspend2ram:
 	addi sp, sp, -(PT_SIZE_ON_STACK)
 	REG_S x1,  PT_RA(sp)
 	REG_S x3,  PT_GP(sp)
@@ -40,25 +40,20 @@ suspend2ram:
 	REG_S x30, PT_T5(sp)
 	REG_S x31, PT_T6(sp)
 
-	/* waiting for wake up source device to wake up */
+   /* waiting for wake up source device to wake up */
 
-	// get pending vector $t0
-	la t0, plic_regs
-#if __riscv_xlen == 64
-	ld t0, 0(t0)
-#else
-	lw t0, 0(t0)
-#endif
-	li s0, 0x1000
-	add t0, t0, s0
+   // get pending vector $t0
+   la t0, plic_regs
 
-	// get wake_mask $t1
-	la t1, wake_mask
-#if __riscv_xlen == 64
-	ld t1, 0(t1)
-#else
-	lw t1, 0(t1)
-#endif
+   REG_L t0, 0(t0)
+
+   li s0, 0x1000
+   add t0, t0, s0
+
+   // get wake_mask $t1
+   la t1, wake_mask
+
+   REG_L t1, 0(t1)
 
 self_loop:
 	wfi

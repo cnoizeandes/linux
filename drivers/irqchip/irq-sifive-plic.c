@@ -118,7 +118,7 @@ static int plic_set_wake(struct irq_data *d, unsigned int on)
 {
 	u32 bit[MAX_USE_REGS];
 	u32 offset = d->hwirq / 32;
-	int i,cpu;
+	int cpu;
 
 	bit[offset] = 1 << (d->hwirq % 32);
 
@@ -134,7 +134,7 @@ static int plic_set_wake(struct irq_data *d, unsigned int on)
 		if (handler->present){
 			unsigned int int_mask[MAX_USE_REGS];
 			u32 __iomem *reg = handler->enable_base + (d->hwirq / 32) * sizeof(u32);
-			u32 target_area = i * (MAX_USE_REGS);
+			u32 target_area = cpu * (MAX_USE_REGS);
 
 			int_mask[offset] = readl(reg);
 			if (on) {
@@ -293,14 +293,6 @@ static int __init plic_init(struct device_node *node,
 	if (WARN_ON(!plic_irqdomain))
 		goto out_iounmap;
 
-	wake_mask = kzalloc((MAX_USE_REGS) * sizeof(u32), GFP_KERNEL);
-	if (WARN_ON(!wake_mask))
-		return -ENOMEM;
-
-	orig = kzalloc(nr_contexts * (MAX_USE_REGS) * sizeof(u32), GFP_KERNEL);
-	if (WARN_ON(!orig))
-		return -ENOMEM;
-
 	for (i = 0; i < nr_contexts; i++) {
 		struct of_phandle_args parent;
 		struct plic_handler *handler;
@@ -356,6 +348,15 @@ done:
 		nr_handlers++;
 	}
 
+	wake_mask = kzalloc((MAX_USE_REGS) * sizeof(u32), GFP_KERNEL);
+	if (WARN_ON(!wake_mask))
+		return -ENOMEM;
+
+	orig = kzalloc(nr_handlers * (MAX_USE_REGS) * sizeof(u32), GFP_KERNEL);
+	pr_info("sizeof(orig)=%ld, sizeof(*orig)=%d\n",sizeof(*orig),sizeof(orig));
+	if (WARN_ON(!orig))
+		return -ENOMEM;
+
 	pr_info("mapped %d interrupts with %d handlers for %d contexts.\n",
 		nr_irqs, nr_handlers, nr_contexts);
 	set_handle_irq(plic_handle_irq);
@@ -365,7 +366,7 @@ out_iounmap:
 	iounmap(plic_regs);
 	if(wake_mask)
 		kfree(wake_mask);
-	if(kfree)
+	if(orig)
 		kfree(orig);
 	return error;
 }
