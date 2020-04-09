@@ -24,6 +24,7 @@
 #include <linux/of.h>
 #include <linux/sched/task_stack.h>
 #include <linux/sched/hotplug.h>
+#include <linux/suspend.h>
 #include <linux/sched/mm.h>
 #include <asm/irq.h>
 #include <asm/mmu_context.h>
@@ -31,7 +32,8 @@
 #include <asm/sections.h>
 #include <asm/sbi.h>
 #include <asm/smp.h>
-
+#include <asm/andesv5/smu.h>
+#include <asm/andesv5/proc.h>
 #include "head.h"
 
 void *__cpu_up_stack_pointer[NR_CPUS];
@@ -172,6 +174,30 @@ void cpu_play_dead(void)
 	idle_task_exit();
 
 	(void)cpu_report_death();
+
+#ifdef CONFIG_ATCSMU
+	if (suspend_begin == PM_SUSPEND_MEM) {
+		// Disable higher privilege's non-wakeup event
+		sbi_suspend_prepare(false, false);
+		// set SMU wakeup enable & MISC control
+		set_wakeup_enable(cpu, 1 << PCS_WAKE_MSIP_OFF);
+		// set SMU light sleep command
+		set_sleep(cpu, DeepSleep_CTL);
+		// backup, suspend and resume
+		sbi_suspend_mem();
+		// enable privilege
+		sbi_suspend_prepare(false, true);
+		goto exit_dead;
+	}
+	sbi_suspend_prepare(false, false);
+	set_wakeup_enable(cpu, 1 << PCS_WAKE_MSIP_OFF);
+	set_sleep(cpu, LightSleep_CTL);
+	cpu_dcache_disable(NULL);
+	wait_for_interrupt();
+	cpu_dcache_enable(NULL);
+	sbi_suspend_prepare(false, true);
+	goto exit_dead;
+#endif
 
 	/* Do not disable software interrupt to restart cpu after WFI */
 	csr_clear(CSR_SIE, SIE_STIE | SIE_SEIE);

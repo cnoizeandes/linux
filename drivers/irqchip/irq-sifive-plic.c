@@ -353,7 +353,6 @@ done:
 		return -ENOMEM;
 
 	orig = kzalloc(nr_handlers * (MAX_USE_REGS) * sizeof(u32), GFP_KERNEL);
-	pr_info("sizeof(orig)=%ld, sizeof(*orig)=%d\n",sizeof(*orig),sizeof(orig));
 	if (WARN_ON(!orig))
 		return -ENOMEM;
 
