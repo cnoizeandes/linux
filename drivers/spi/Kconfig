@@ -750,6 +750,11 @@ config SPI_SIFIVE
         help
           This exposes the SPI controller IP from SiFive.
 
+config SPI_ATCSPI200
+        tristate "ANDES TECH SPI controller"
+        depends on HAS_IOMEM
+        help
+          This exposes the SPI controller IP from Andes.
 #
 # Add new SPI master controllers in alphabetical order above this line
 #
