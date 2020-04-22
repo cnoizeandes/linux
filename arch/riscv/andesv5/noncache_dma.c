@@ -118,7 +118,7 @@ void *arch_dma_alloc(struct device *dev, size_t size,
 	kvaddr = swiotlb_alloc(dev, size, handle, gfp, attrs);
 	if (!kvaddr)
 		goto no_mem;
-	coherent_kvaddr = dma_remap(dma_to_phys(dev, *handle), size);
+	coherent_kvaddr = ioremap_nocache(dma_to_phys(dev, *handle), size);
 	if (!coherent_kvaddr)
 		goto no_map;
 
@@ -136,7 +136,7 @@ void arch_dma_free(struct device *dev, size_t size, void *vaddr,
 	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, handle));
 
 	size = PAGE_ALIGN(size);
-	dma_unmap(vaddr);
+	iounmap(vaddr);
 	swiotlb_free(dev, size, swiotlb_addr, handle, attrs);
 
 	return;
