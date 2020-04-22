@@ -276,8 +276,12 @@ config HIGHMEM
 
 config PMA
 	bool "PMA support"
+	default y
 	help
-	  Say N here if bitmap don't have PMA support.
+	  Since 27 series we have PMA support to control non-cacheable
+	  region.  It is transparent to user.  If you want to reduce
+	  marginal code size, say N.
+
 endmenu
 
 menu "Kernel type"

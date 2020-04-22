@@ -132,6 +132,12 @@ pmd_t trampoline_pmd[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
 phys_addr_t pa_msb;
 asmlinkage void __init setup_maxpa(void)
 {
+#ifdef CONFIG_PMA
+	if (sbi_probe_pma()) {
+		pa_msb = 0;
+		return;
+	}
+#endif
 	csr_write(satp, SATP_PPN);
 	pa_msb = (csr_read(satp) + 1) >>1;
 }

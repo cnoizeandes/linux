@@ -38,6 +38,7 @@
 #define SBI_SET_RESET_VEC 19
 #define SBI_SET_PMA 20
 #define SBI_FREE_PMA 21
+#define SBI_PROBE_PMA 22
 
 #define SBI_CALL(which, arg0, arg1, arg2) ({			\
 	register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);	\
@@ -56,6 +57,11 @@
 #define SBI_CALL_1(which, arg0) SBI_CALL(which, arg0, 0, 0)
 #define SBI_CALL_2(which, arg0, arg1) SBI_CALL(which, arg0, arg1, 0)
 #define SBI_CALL_3(which, arg0, arg1, arg2) SBI_CALL(which, arg0, arg1, arg2)
+
+static inline bool sbi_probe_pma(void)
+{
+	return SBI_CALL_0(SBI_PROBE_PMA);
+}
 
 static inline void sbi_set_pma(phys_addr_t offset, unsigned long vaddr,
 			       size_t size)
