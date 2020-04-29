@@ -141,6 +141,28 @@ void cpu_dma_wb_range(unsigned long start, unsigned long end)
 }
 EXPORT_SYMBOL(cpu_dma_wb_range);
 
+/*non-blocking load store*/
+unsigned long get_non_blocking_status(void)
+{
+	return SBI_CALL_0(SBI_GET_MMISC_CTL_STATUS);
+}
+
+void sbi_enable_non_blocking_load_store(void)
+{
+	unsigned long flags;
+	local_irq_save(flags);
+	SBI_CALL_1(SBI_NON_BLOCKING_LOAD_STORE_OP, 1);
+	local_irq_restore(flags);
+}
+
+void sbi_disable_non_blocking_load_store(void)
+{
+	unsigned long flags;
+	local_irq_save(flags);
+	SBI_CALL_1(SBI_NON_BLOCKING_LOAD_STORE_OP, 0);
+	local_irq_restore(flags);
+}
+
 /* L1 Cache */
 int cpu_l1c_status(void)
 {

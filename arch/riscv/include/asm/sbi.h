@@ -28,6 +28,8 @@
 #define SBI_L1CACHE_STATUS 17
 #define SBI_RESTART 18
 #define SBI_SET_RESET_VEC 19
+#define SBI_NON_BLOCKING_LOAD_STORE_OP 0x09000001
+#define SBI_GET_MMISC_CTL_STATUS 0x09000004
 
 #define SBI_CALL(which, arg0, arg1, arg2, arg3) ({		\
 	register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);	\

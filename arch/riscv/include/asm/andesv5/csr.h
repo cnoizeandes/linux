@@ -31,6 +31,10 @@
 #define CCTL_L1D_VA_WB		1
 #define CCTL_L1D_VA_WBINVAL	2
 
+/* non-blocking & write around */
+#define MMISC_CTL_NON_BLOCKING_ENABLE  (0x1  << MMISC_CTL_NON_BLOCKING_OFFSET)
+#define MMISC_CTL_NON_BLOCKING_OFFSET  0x8
+
 /* L1 I-cache , D-cache */
 #define CACHE_CTL_offIC_EN  0   /* Enable I-cache */
 #define CACHE_CTL_offDC_EN  1   /* Enable D-cache */

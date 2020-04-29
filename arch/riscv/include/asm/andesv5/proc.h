@@ -9,6 +9,9 @@ void cpu_dcache_disable(void *info);
 uint32_t cpu_l2c_ctl_status(void);
 void cpu_l2c_enable(void);
 void cpu_l2c_disable(void);
+unsigned long get_non_blocking_status(void);
+void sbi_enable_non_blocking_load_store(void);
+void sbi_disable_non_blocking_load_store(void);
 
 void cpu_dma_inval_range(unsigned long start, unsigned long end);
 void cpu_dma_wb_range(unsigned long start, unsigned long end);
