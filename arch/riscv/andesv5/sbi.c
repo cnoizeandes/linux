@@ -45,6 +45,8 @@ static ssize_t proc_read_sbi_en(struct file *file, char __user *userbuf,
     char buf[18];
     if (!strncmp(file->f_path.dentry->d_name.name, "non_blocking", 12)) {
         ret = sprintf(buf, "non-blocking: %s\n", (get_non_blocking_status() & MMISC_CTL_NON_BLOCKING_ENABLE) ? "Enabled" : "Disabled");
+    } else if (!strncmp(file->f_path.dentry->d_name.name, "write_around", 12)) {
+        ret = sprintf(buf, "write_around: %s\n", (get_write_around_status() & MCACHE_CTL_DC_WAROUND_1_EN) ? "Enabled" : "Disabled");
     } else {
 		return -EFAULT;
     }
@@ -76,6 +78,14 @@ static ssize_t proc_write_sbi_en(struct file *file,
 		} else if (!en && (get_non_blocking_status() & MMISC_CTL_NON_BLOCKING_ENABLE)) {
 			sbi_disable_non_blocking_load_store();
 			DEBUG(debug, 1, "NON-blocking: Disabled\n");
+		}
+	} else if (!strncmp(file->f_path.dentry->d_name.name, "write_around", 12)) {
+		if (en && !(get_write_around_status() & MCACHE_CTL_DC_WAROUND_1_EN)) {
+			sbi_enable_write_around();
+			DEBUG(debug, 1, "Write-around: Enabled\n");
+		} else if (!en && (get_write_around_status() & MCACHE_CTL_DC_WAROUND_1_EN)) {
+			sbi_disable_write_around();
+			DEBUG(debug, 1, "Write-around: Disabled\n");
 		}
 	} else
 		return -EFAULT;
@@ -120,6 +130,7 @@ static void remove_proc_table(struct entry_struct *table)
 struct entry_struct proc_table_sbi[] = {
 
 	{"non_blocking", 0644, &en_fops},	//sbi_ae350_non_blocking_load_store
+	{"write_around", 0644, &en_fops},       //sbi_ae350_write_around
 };
 static int __init init_sbi(void)
 {
