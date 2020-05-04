@@ -29,8 +29,9 @@ DEFINE_PER_CPU(struct andesv5_cache_info, cpu_cache_info) = {
 };
 static void fill_cpu_cache_info(struct andesv5_cache_info *cpu_ci)
 {
+    int ncpu = get_cpu();
 	struct cpu_cacheinfo *this_cpu_ci =
-			get_cpu_cacheinfo(smp_processor_id());
+			get_cpu_cacheinfo(ncpu);
 	struct cacheinfo *this_leaf = this_cpu_ci->info_list;
 	unsigned int i = 0;
 
@@ -39,16 +40,19 @@ static void fill_cpu_cache_info(struct andesv5_cache_info *cpu_ci)
 			cpu_ci->dcache_line_size = this_leaf->coherency_line_size;
 		}
 	cpu_ci->init_done = true;
+    put_cpu();
 }
 
 
 inline int get_cache_line_size(void)
 {
+    int ncpu = get_cpu();
 	struct andesv5_cache_info *cpu_ci =
-		&per_cpu(cpu_cache_info, smp_processor_id());
+		&per_cpu(cpu_cache_info, ncpu);
 
 	if(unlikely(cpu_ci->init_done == false))
 		fill_cpu_cache_info(cpu_ci);
+    put_cpu();
 	return cpu_ci->dcache_line_size;
 }
 
@@ -59,7 +63,7 @@ static uint32_t cpu_l2c_get_cctl_status(void)
 
 void cpu_dcache_wb_range(unsigned long start, unsigned long end, int line_size)
 {
-	int mhartid = smp_processor_id();
+	int mhartid = get_cpu();
 	unsigned long pa;
 	while (end > start) {
 		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
@@ -75,11 +79,12 @@ void cpu_dcache_wb_range(unsigned long start, unsigned long end, int line_size)
 
 		start += line_size;
 	}
+    put_cpu();
 }
 
 void cpu_dcache_inval_range(unsigned long start, unsigned long end, int line_size)
 {
-	int mhartid = smp_processor_id();
+	int mhartid = get_cpu();
 	unsigned long pa;
 	while (end > start) {
 		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
@@ -95,6 +100,7 @@ void cpu_dcache_inval_range(unsigned long start, unsigned long end, int line_siz
 
 		start += line_size;
 	}
+    put_cpu();
 }
 void cpu_dma_inval_range(unsigned long start, unsigned long end)
 {
@@ -192,7 +198,7 @@ uint32_t cpu_l2c_ctl_status(void)
 void cpu_l2c_disable(void)
 {
 #ifdef CONFIG_SMP
-	int mhartid = smp_processor_id();
+	int mhartid = get_cpu();
 #else
 	int mhartid = 0;
 #endif
@@ -223,6 +229,9 @@ void cpu_l2c_disable(void)
 	       != CCTL_L2_STATUS_IDLE);
 
 	local_irq_restore(flags);
+    #ifdef CONFIG_SMP
+    put_cpu();
+    #endif
 }
 
 #ifndef CONFIG_SMP
@@ -266,7 +275,7 @@ EXPORT_SYMBOL(cpu_l2c_wb_range);
 #else
 void cpu_l2c_inval_range(unsigned long pa, unsigned long size)
 {
-    int mhartid = smp_processor_id();
+    int mhartid = get_cpu();
     unsigned long line_size = get_cache_line_size();
     unsigned long start = pa, end = pa + size;
     unsigned long align_start, align_end;
@@ -281,12 +290,13 @@ void cpu_l2c_inval_range(unsigned long pa, unsigned long size)
                 != CCTL_L2_STATUS_IDLE);
         align_start += line_size;
     }
+    put_cpu();
 }
 EXPORT_SYMBOL(cpu_l2c_inval_range);
 
 void cpu_l2c_wb_range(unsigned long pa, unsigned long size)
 {
-    int mhartid = smp_processor_id();
+    int mhartid = get_cpu();
     unsigned long line_size = get_cache_line_size();
     unsigned long start = pa, end = pa + size;
     unsigned long align_start, align_end;
@@ -301,6 +311,7 @@ void cpu_l2c_wb_range(unsigned long pa, unsigned long size)
                 != CCTL_L2_STATUS_IDLE);
         align_start += line_size;
     }
+    put_cpu();
 }
 EXPORT_SYMBOL(cpu_l2c_wb_range);
 #endif
@@ -365,7 +376,7 @@ void l2c_pmu_event_enable(u64 config, int idx)
 void l2c_pmu_event_enable(u64 config, int idx)
 {
 	int n = idx / SEL_PER_CTL;
-	int mhartid = smp_processor_id();
+	int mhartid = get_cpu();
 	u32 vall = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
 	u32 valh = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
 	u64 val = ((u64)valh << 32) | vall;
@@ -379,6 +390,7 @@ void l2c_pmu_event_enable(u64 config, int idx)
 	valh = val >> 32;
 	writel(vall, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
 	writel(valh, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
+    put_cpu();
 }
 #endif
 #endif
