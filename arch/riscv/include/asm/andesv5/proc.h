@@ -17,6 +17,8 @@ void sbi_enable_write_around(void);
 void sbi_disable_write_around(void);
 void sbi_enable_l1i_cache(void);
 void sbi_disable_l1i_cache(void);
+void sbi_enable_l1d_cache(void);
+void sbi_disable_l1d_cache(void);
 
 void cpu_dma_inval_range(unsigned long start, unsigned long end);
 void cpu_dma_wb_range(unsigned long start, unsigned long end);

@@ -33,6 +33,7 @@
 #define SBI_GET_MCACHE_CTL_STATUS 0x09000003
 #define SBI_GET_MMISC_CTL_STATUS 0x09000004
 #define SBI_L1CACHE_I_PREFETCH_OP 0x09000005
+#define SBI_L1CACHE_D_PREFETCH_OP 0x09000006
 
 #define SBI_CALL(which, arg0, arg1, arg2, arg3) ({		\
 	register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);	\
