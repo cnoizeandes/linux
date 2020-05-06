@@ -185,6 +185,26 @@ void sbi_disable_write_around(void)
 	local_irq_restore(flags);
 }
 
+/* L1 Cache Prefetch */
+
+void sbi_enable_l1i_cache(void)
+{
+        unsigned long flags;
+
+        local_irq_save(flags);
+        SBI_CALL_1(SBI_L1CACHE_I_PREFETCH_OP, 1);
+        local_irq_restore(flags);
+}
+
+void sbi_disable_l1i_cache(void)
+{
+        unsigned long flags;
+
+        local_irq_save(flags);
+        SBI_CALL_1(SBI_L1CACHE_I_PREFETCH_OP, 0);
+        local_irq_restore(flags);
+}
+
 /* L1 Cache */
 int cpu_l1c_status(void)
 {

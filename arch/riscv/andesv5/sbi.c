@@ -47,6 +47,8 @@ static ssize_t proc_read_sbi_en(struct file *file, char __user *userbuf,
         ret = sprintf(buf, "non-blocking: %s\n", (get_non_blocking_status() & MMISC_CTL_NON_BLOCKING_ENABLE) ? "Enabled" : "Disabled");
     } else if (!strncmp(file->f_path.dentry->d_name.name, "write_around", 12)) {
         ret = sprintf(buf, "write_around: %s\n", (get_write_around_status() & MCACHE_CTL_DC_WAROUND_1_EN) ? "Enabled" : "Disabled");
+    } else if (!strncmp(file->f_path.dentry->d_name.name, "l1i_prefetch", 12)) {
+        ret = sprintf(buf, "l1i_prefetch: %s\n", (get_write_around_status() & MCACHE_CTL_L1I_PREFETCH_EN) ? "Enabled" : "Disabled");
     } else {
 		return -EFAULT;
     }
@@ -86,6 +88,14 @@ static ssize_t proc_write_sbi_en(struct file *file,
 		} else if (!en && (get_write_around_status() & MCACHE_CTL_DC_WAROUND_1_EN)) {
 			sbi_disable_write_around();
 			DEBUG(debug, 1, "Write-around: Disabled\n");
+		}
+	} else if (!strncmp(file->f_path.dentry->d_name.name, "l1i_prefetch", 12)) {
+		if (en && !(get_write_around_status() & MCACHE_CTL_L1I_PREFETCH_EN)) {
+			sbi_enable_l1i_cache();
+			DEBUG(debug, 1, "L1I_cache_Prefetch: Enabled\n");
+		} else if (!en && (get_write_around_status() & MCACHE_CTL_L1I_PREFETCH_EN)) {
+			sbi_disable_l1i_cache();
+			DEBUG(debug, 1, "L1I_cache_Prefetch: Disabled\n");
 		}
 	} else
 		return -EFAULT;
@@ -131,6 +141,7 @@ struct entry_struct proc_table_sbi[] = {
 
 	{"non_blocking", 0644, &en_fops},	//sbi_ae350_non_blocking_load_store
 	{"write_around", 0644, &en_fops},       //sbi_ae350_write_around
+	{"l1i_prefetch", 0644, &en_fops},       //sbi_ae350_L1I-prefetch
 };
 static int __init init_sbi(void)
 {
