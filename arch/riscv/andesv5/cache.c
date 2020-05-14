@@ -185,6 +185,16 @@ void sbi_disable_write_around(void)
 	local_irq_restore(flags);
 }
 
+void sbi_set_mcache_ctl(unsigned long input)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	SBI_CALL_1(SBI_SET_MCACHE_CTL, input);
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL(sbi_set_mcache_ctl);
+
 /* L1 Cache Prefetch */
 
 void sbi_enable_l1i_cache(void)

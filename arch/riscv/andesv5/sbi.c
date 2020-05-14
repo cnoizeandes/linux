@@ -51,6 +51,8 @@ static ssize_t proc_read_sbi_en(struct file *file, char __user *userbuf,
         ret = sprintf(buf, "l1i_prefetch: %s\n", (get_write_around_status() & MCACHE_CTL_L1I_PREFETCH_EN) ? "Enabled" : "Disabled");
     } else if (!strncmp(file->f_path.dentry->d_name.name, "l1d_prefetch", 12)) {
         ret = sprintf(buf, "l1d_prefetch: %s\n", (get_write_around_status() & MCACHE_CTL_L1D_PREFETCH_EN) ? "Enabled" : "Disabled");
+    } else if (!strncmp(file->f_path.dentry->d_name.name, "mcache_ctl", 10)) {
+        ret = sprintf(buf, "mcache_ctl: %x\n", get_write_around_status());
     } else {
 		return -EFAULT;
     }
@@ -72,7 +74,7 @@ static ssize_t proc_write_sbi_en(struct file *file,
 
 	inbuf[count] = '\0';
 
-	if (!sscanf(inbuf, "%lu", &en) || en > 1)
+	if (!sscanf(inbuf, "%lx", &en))
 		return -EFAULT;
 
 	if (!strncmp(file->f_path.dentry->d_name.name, "non_blocking", 12)) {
@@ -107,6 +109,8 @@ static ssize_t proc_write_sbi_en(struct file *file,
 			sbi_disable_l1d_cache();
 			DEBUG(debug, 1, "L1D_cache_Prefetch: Disabled\n");
 		}
+	} else if (!strncmp(file->f_path.dentry->d_name.name, "mcache_ctl", 10)) {
+		sbi_set_mcache_ctl(en);
 	} else
 		return -EFAULT;
 
@@ -153,6 +157,7 @@ struct entry_struct proc_table_sbi[] = {
 	{"write_around", 0644, &en_fops},       //sbi_ae350_write_around
 	{"l1i_prefetch", 0644, &en_fops},       //sbi_ae350_L1I-prefetch
 	{"l1d_prefetch", 0644, &en_fops},       //sbi_ae350_L1D-prefetch
+	{"mcache_ctl", 0644, &en_fops},		//sbi_ae350_mcache_ctl
 };
 static int __init init_sbi(void)
 {
