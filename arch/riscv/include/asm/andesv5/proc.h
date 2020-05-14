@@ -20,6 +20,7 @@ void sbi_disable_l1i_cache(void);
 void sbi_enable_l1d_cache(void);
 void sbi_disable_l1d_cache(void);
 void sbi_set_mcache_ctl(unsigned long input);
+void sbi_set_mmisc_ctl(unsigned long input);
 
 void cpu_dma_inval_range(unsigned long start, unsigned long end);
 void cpu_dma_wb_range(unsigned long start, unsigned long end);
