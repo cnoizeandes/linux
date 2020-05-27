@@ -37,18 +37,6 @@ enum fixed_addresses {
 	__end_of_fixed_addresses,
 };
 
-#define FIXADDR_TOP      (VMEMMAP_START)
-#ifdef CONFIG_64BIT
-#define FIXADDR_SIZE     PMD_SIZE
-#else
-#ifdef CONFIG_HIGHMEM
-#define FIXADDR_SIZE     (__end_of_fixed_addresses << PAGE_SHIFT)
-#else
-#define FIXADDR_SIZE     PGDIR_SIZE
-#endif
-#endif
-#define FIXADDR_START    (FIXADDR_TOP - FIXADDR_SIZE)
-
 #define FIXMAP_PAGE_IO		PAGE_KERNEL
 
 #define __early_set_fixmap	__set_fixmap

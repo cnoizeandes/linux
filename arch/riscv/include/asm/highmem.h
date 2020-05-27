@@ -25,7 +25,7 @@
 
 static inline void flush_cache_kmaps(void)
 {
-		flush_tlb_all();
+	flush_cache_all();
 }
 
 /* Declarations for highmem.c */

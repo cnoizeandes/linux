@@ -85,8 +85,8 @@ extern pgd_t swapper_pg_dir[];
 
 #ifdef CONFIG_HIGHMEM
 #define VMALLOC_SIZE     (SZ_128M)
-/*Reserved 1023K from RAM TOP*/
-#define VMALLOC_END      (0xfff00000UL)
+/*Reserved 4MB from top of RAM to align with PGDIR_SIZE*/
+#define VMALLOC_END      (0xffc00000UL)
 #define VMALLOC_START    (VMALLOC_END - VMALLOC_SIZE)
 #else
 #define VMALLOC_SIZE     (KERN_VIRT_SIZE >> 1)
@@ -105,6 +105,15 @@ extern pgd_t swapper_pg_dir[];
 #define VMEMMAP_START	(VMALLOC_START - VMEMMAP_SIZE)
 
 #define vmemmap		((struct page *)VMEMMAP_START)
+
+#define FIXADDR_TOP		VMEMMAP_START
+
+#ifdef CONFIG_64BIT
+#define FIXADDR_SIZE     PMD_SIZE
+#else
+#define FIXADDR_SIZE     PGDIR_SIZE
+#endif
+#define FIXADDR_START    (FIXADDR_TOP - FIXADDR_SIZE)
 
 #ifdef CONFIG_HIGHMEM
 /* Set LOWMEM_END alignment with PGDIR_SIZE */

@@ -77,16 +77,22 @@ static inline void print_mlm(char *name, unsigned long b, unsigned long t)
 static void print_vm_layout(void)
 {
 	pr_notice("Virtual kernel memory layout:\n");
+#ifdef CONFIG_HIGHMEM
+	print_mlm("lowmem", (unsigned long)PAGE_OFFSET,
+		  (unsigned long)high_memory);
+	print_mlm("pkmap", (unsigned long)PKMAP_BASE,
+		  (unsigned long)FIXADDR_START);
+#endif
 	print_mlk("fixmap", (unsigned long)FIXADDR_START,
 		  (unsigned long)FIXADDR_TOP);
-	print_mlm("pci io", (unsigned long)PCI_IO_START,
-		  (unsigned long)PCI_IO_END);
 	print_mlm("vmemmap", (unsigned long)VMEMMAP_START,
 		  (unsigned long)VMEMMAP_END);
 	print_mlm("vmalloc", (unsigned long)VMALLOC_START,
 		  (unsigned long)VMALLOC_END);
+#ifndef CONFIG_HIGHMEM
 	print_mlm("lowmem", (unsigned long)PAGE_OFFSET,
 		  (unsigned long)high_memory);
+#endif
 }
 #else
 static void print_vm_layout(void) { }
