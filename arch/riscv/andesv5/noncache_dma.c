@@ -21,6 +21,7 @@
 #include <linux/mm.h>
 #include <linux/dma-mapping.h>
 #include <linux/dma-direct.h>
+#include <linux/dma-noncoherent.h>
 #include <linux/scatterlist.h>
 #include <linux/highmem.h>
 #include <asm/andesv5/proc.h>
