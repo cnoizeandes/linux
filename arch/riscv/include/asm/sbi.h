@@ -50,14 +50,50 @@
 	a0;							\
 })
 
+/* SBI v0.2 Interface */
+#define SBI_v_0_2_CALL(which, arg0, arg1, arg2) ({	\
+	register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);	\
+	register uintptr_t a1 asm ("a1") = (uintptr_t)(arg1);	\
+	register uintptr_t a2 asm ("a2") = (uintptr_t)(arg2);	\
+	register uintptr_t a6 asm ("a6") = (uintptr_t)(which);	\
+	register uintptr_t a7 asm ("a7") = (uintptr_t)0x0900031E;\
+	asm volatile ("ecall"					\
+		      : "+r" (a0), "+r"(a1)			\
+		      : "r" (a2), "r"(a6), "r"(a7)		\
+		      : "memory");				\
+	a1;							\
+})
+
 /* Lazy implementations until SBI is finalized */
-#define SBI_CALL_0(which) SBI_CALL(which, 0, 0, 0, 0)
-#define SBI_CALL_1(which, arg0) SBI_CALL(which, arg0, 0, 0, 0)
-#define SBI_CALL_2(which, arg0, arg1) SBI_CALL(which, arg0, arg1, 0, 0)
-#define SBI_CALL_3(which, arg0, arg1, arg2) \
-		SBI_CALL(which, arg0, arg1, arg2, 0)
-#define SBI_CALL_4(which, arg0, arg1, arg2, arg3) \
-		SBI_CALL(which, arg0, arg1, arg2, arg3)
+#define SBI_CALL_0(which) SBI_CALL(which, 0, 0, 0)
+#define SBI_CALL_1(which, arg0) SBI_CALL(which, arg0, 0, 0)
+#define SBI_CALL_2(which, arg0, arg1) SBI_CALL(which, arg0, arg1, 0)
+#define SBI_CALL_3(which, arg0, arg1, arg2) SBI_CALL(which, arg0, arg1, arg2)
+
+#define SBI_v_0_2_CALL_0(which) SBI_v_0_2_CALL(which, 0, 0, 0)
+#define SBI_v_0_2_CALL_1(which, arg0) SBI_v_0_2_CALL(which, arg0, 0, 0)
+#define SBI_v_0_2_CALL_2(which, arg0, arg1) SBI_v_0_2_CALL(which, arg0, arg1, 0)
+#define SBI_v_0_2_CALL_3(which, arg0, arg1, arg2) SBI_v_0_2_CALL(which, arg0, arg1, arg2)
+static inline bool sbi_probe_pma(void)
+{
+	return SBI_CALL_0(SBI_PROBE_PMA);
+}
+
+static inline void sbi_set_pma(phys_addr_t offset, unsigned long vaddr,
+			       size_t size)
+{
+	SBI_CALL_3(SBI_SET_PMA, offset, vaddr, size);
+}
+
+static inline void sbi_free_pma(unsigned long vaddr)
+{
+	SBI_CALL_1(SBI_FREE_PMA, vaddr);
+}
+
+static inline void sbi_set_reset_vec(int val)
+{
+	SBI_CALL_1(SBI_SET_RESET_VEC, val);
+}
 
 static inline void sbi_restart(int val)
 {
