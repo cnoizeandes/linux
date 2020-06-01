@@ -17,27 +17,32 @@
 #define SBI_REMOTE_SFENCE_VMA 6
 #define SBI_REMOTE_SFENCE_VMA_ASID 7
 #define SBI_SHUTDOWN 8
-#define SBI_TRIGGER 9
-#define SBI_SET_PFM 10
-#define SBI_READ_POWERBRAKE 11
-#define SBI_WRITE_POWERBRAKE 12
-#define SBI_SUSPEND_PREPARE 13
-#define SBI_SUSPEND_MEM 14
-#define SBI_DCACHE_OP 15
-#define SBI_ICACHE_OP 16
-#define SBI_L1CACHE_STATUS 17
-#define SBI_RESTART 18
-#define SBI_SET_RESET_VEC 19
-#define SBI_NON_BLOCKING_LOAD_STORE_OP 0x09000001
-#define SBI_WRITE_AROUND_OP 0x09000002
-#define SBI_GET_MCACHE_CTL_STATUS 0x09000003
-#define SBI_GET_MMISC_CTL_STATUS 0x09000004
-#define SBI_L1CACHE_I_PREFETCH_OP 0x09000005
-#define SBI_L1CACHE_D_PREFETCH_OP 0x09000006
-#define SBI_SET_MCACHE_CTL 0x09000007
-#define SBI_SET_MMISC_CTL 0x09000008
+/* Andes's platform specific SBI */
+#define SBI_TRIGGER 0
+#define SBI_SET_PFM 1
+#define SBI_READ_POWERBRAKE 2
+#define SBI_WRITE_POWERBRAKE 3
+#define SBI_SUSPEND_PREPARE 4
+#define SBI_SUSPEND_MEM 5
+#define SBI_DCACHE_OP 6
+#define SBI_ICACHE_OP 7
+#define SBI_L1CACHE_STATUS 8
+#define SBI_RESTART 9
+#define SBI_SET_RESET_VEC 10
+#define SBI_SET_PMA 11
+#define SBI_FREE_PMA 12
+#define SBI_PROBE_PMA 13
+#define SBI_NON_BLOCKING_LOAD_STORE_OP 14
+#define SBI_WRITE_AROUND_OP 15
+#define SBI_GET_MCACHE_CTL_STATUS 16
+#define SBI_GET_MMISC_CTL_STATUS 17
+#define SBI_L1CACHE_I_PREFETCH_OP 18
+#define SBI_L1CACHE_D_PREFETCH_OP 19
+#define SBI_SET_MCACHE_CTL 20
+#define SBI_SET_MMISC_CTL 21
 
-#define SBI_CALL(which, arg0, arg1, arg2, arg3) ({		\
+
+#define SBI_CALL(which, arg0, arg1, arg2) ({			\
 	register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);	\
 	register uintptr_t a1 asm ("a1") = (uintptr_t)(arg1);	\
 	register uintptr_t a2 asm ("a2") = (uintptr_t)(arg2);	\
