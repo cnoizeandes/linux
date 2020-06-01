@@ -147,110 +147,112 @@ void cpu_dma_wb_range(unsigned long start, unsigned long end)
 }
 EXPORT_SYMBOL(cpu_dma_wb_range);
 
-/*non-blocking load store*/
-unsigned long get_non_blocking_status(void)
-{
-       return SBI_CALL_0(SBI_GET_MMISC_CTL_STATUS);
-}
-
-void sbi_enable_non_blocking_load_store(void)
-{
-       unsigned long flags;
-       local_irq_save(flags);
-       SBI_CALL_1(SBI_NON_BLOCKING_LOAD_STORE_OP, 1);
-       local_irq_restore(flags);
-}
-
-void sbi_disable_non_blocking_load_store(void)
-{
-       unsigned long flags;
-       local_irq_save(flags);
-       SBI_CALL_1(SBI_NON_BLOCKING_LOAD_STORE_OP, 0);
-       local_irq_restore(flags);
-}
-
-/*write around*/
-unsigned long get_write_around_status(void)
-{
-       return SBI_CALL_0(SBI_GET_MCACHE_CTL_STATUS);
-}
-
-void sbi_enable_write_around(void)
-{
-       unsigned long flags;
-       local_irq_save(flags);
-       SBI_CALL_1(SBI_WRITE_AROUND_OP, 1);
-       local_irq_restore(flags);
-}
-
-void sbi_disable_write_around(void)
-{
-       unsigned long flags;
-       local_irq_save(flags);
-       SBI_CALL_1(SBI_WRITE_AROUND_OP, 0);
-       local_irq_restore(flags);
-}
-
 void sbi_set_mcache_ctl(unsigned long input)
 {
-       unsigned long flags;
+	unsigned long flags;
 
-       local_irq_save(flags);
-       SBI_CALL_1(SBI_SET_MCACHE_CTL, input);
-       local_irq_restore(flags);
+	local_irq_save(flags);
+	SBI_v_0_2_CALL_1(SBI_SET_MCACHE_CTL, input);
+	local_irq_restore(flags);
 }
 EXPORT_SYMBOL(sbi_set_mcache_ctl);
 
 void sbi_set_mmisc_ctl(unsigned long input)
 {
-       unsigned long flags;
-       local_irq_save(flags);
-       SBI_CALL_1(SBI_SET_MMISC_CTL, input);
-       local_irq_restore(flags);
+	unsigned long flags;
+
+	local_irq_save(flags);
+	SBI_v_0_2_CALL_1(SBI_SET_MMISC_CTL, input);
+	local_irq_restore(flags);
 }
 EXPORT_SYMBOL(sbi_set_mmisc_ctl);
 
+int get_non_blocking_status(void)
+{
+	return SBI_v_0_2_CALL_0(SBI_GET_MMISC_CTL_STATUS);
+}
+
+void sbi_enable_non_blocking_load_store(void)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	SBI_v_0_2_CALL_1(SBI_NON_BLOCKING_LOAD_STORE_OP, 1);
+	local_irq_restore(flags);
+}
+
+void sbi_disable_non_blocking_load_store(void)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	SBI_v_0_2_CALL_1(SBI_NON_BLOCKING_LOAD_STORE_OP, 0);
+	local_irq_restore(flags);
+}
+
+int get_write_around_status(void)
+{
+	return SBI_v_0_2_CALL_0(SBI_GET_MCACHE_CTL_STATUS);
+}
+
+void sbi_enable_write_around(void)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	SBI_v_0_2_CALL_1(SBI_WRITE_AROUND_OP, 1);
+	local_irq_restore(flags);
+}
+
+void sbi_disable_write_around(void)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	SBI_v_0_2_CALL_1(SBI_WRITE_AROUND_OP, 0);
+	local_irq_restore(flags);
+}
 /* L1 Cache Prefetch */
+
 void sbi_enable_l1i_cache(void)
 {
-        unsigned long flags;
+	unsigned long flags;
 
-        local_irq_save(flags);
-        SBI_CALL_1(SBI_L1CACHE_I_PREFETCH_OP, 1);
-        local_irq_restore(flags);
+	local_irq_save(flags);
+	SBI_v_0_2_CALL_1(SBI_L1CACHE_I_PREFETCH_OP, 1);
+	local_irq_restore(flags);
 }
 
 void sbi_disable_l1i_cache(void)
 {
-        unsigned long flags;
+	unsigned long flags;
 
-        local_irq_save(flags);
-        SBI_CALL_1(SBI_L1CACHE_I_PREFETCH_OP, 0);
-        local_irq_restore(flags);
+	local_irq_save(flags);
+	SBI_v_0_2_CALL_1(SBI_L1CACHE_I_PREFETCH_OP, 0);
+	local_irq_restore(flags);
 }
 
 void sbi_enable_l1d_cache(void)
 {
-        unsigned long flags;
+	unsigned long flags;
 
-        local_irq_save(flags);
-        SBI_CALL_1(SBI_L1CACHE_D_PREFETCH_OP, 1);
-        local_irq_restore(flags);
+	local_irq_save(flags);
+	SBI_v_0_2_CALL_1(SBI_L1CACHE_D_PREFETCH_OP, 1);
+	local_irq_restore(flags);
 }
 
 void sbi_disable_l1d_cache(void)
 {
-        unsigned long flags;
+	unsigned long flags;
 
-        local_irq_save(flags);
-        SBI_CALL_1(SBI_L1CACHE_D_PREFETCH_OP, 0);
-         local_irq_restore(flags);
- }
-
+	local_irq_save(flags);
+	SBI_v_0_2_CALL_1(SBI_L1CACHE_D_PREFETCH_OP, 0);
+	local_irq_restore(flags);
+}
 /* L1 Cache */
 int cpu_l1c_status(void)
 {
-	return SBI_CALL_0(SBI_L1CACHE_STATUS);
+	return SBI_v_0_2_CALL_0(SBI_L1CACHE_STATUS);
 }
 
 void cpu_icache_enable(void *info)
@@ -258,7 +260,7 @@ void cpu_icache_enable(void *info)
 	unsigned long flags;
 
 	local_irq_save(flags);
-	SBI_CALL_1(SBI_ICACHE_OP, 1);
+	SBI_v_0_2_CALL_1(SBI_ICACHE_OP, 1);
     local_irq_restore(flags);
 }
 
@@ -267,7 +269,7 @@ void cpu_icache_disable(void *info)
 	unsigned long flags;
 
 	local_irq_save(flags);
-	SBI_CALL_1(SBI_ICACHE_OP, 0);
+	SBI_v_0_2_CALL_1(SBI_ICACHE_OP, 0);
     local_irq_restore(flags);
 }
 
@@ -276,7 +278,7 @@ void cpu_dcache_enable(void *info)
 	unsigned long flags;
 
 	local_irq_save(flags);
-	SBI_CALL_1(SBI_DCACHE_OP, 1);
+	SBI_v_0_2_CALL_1(SBI_DCACHE_OP, 1);
     local_irq_restore(flags);
 }
 
@@ -285,7 +287,7 @@ void cpu_dcache_disable(void *info)
 	unsigned long flags;
 
 	local_irq_save(flags);
-	SBI_CALL_1(SBI_DCACHE_OP, 0);
+	SBI_v_0_2_CALL_1(SBI_DCACHE_OP, 0);
 	local_irq_restore(flags);
 }
 

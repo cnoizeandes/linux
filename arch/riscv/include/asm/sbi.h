@@ -1,6 +1,14 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (C) 2015 Regents of the University of California
+ *
+ *   This program is free software; you can redistribute it and/or
+ *   modify it under the terms of the GNU General Public License
+ *   as published by the Free Software Foundation, version 2.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
  */
 
 #ifndef _ASM_RISCV_SBI_H
@@ -46,11 +54,10 @@
 	register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);	\
 	register uintptr_t a1 asm ("a1") = (uintptr_t)(arg1);	\
 	register uintptr_t a2 asm ("a2") = (uintptr_t)(arg2);	\
-	register uintptr_t a3 asm ("a3") = (uintptr_t)(arg3);	\
 	register uintptr_t a7 asm ("a7") = (uintptr_t)(which);	\
 	asm volatile ("ecall"					\
 		      : "+r" (a0)				\
-		      : "r" (a1), "r" (a2), "r" (a3), "r" (a7)	\
+		      : "r" (a1), "r" (a2), "r" (a7)		\
 		      : "memory");				\
 	a0;							\
 })
@@ -81,33 +88,43 @@
 #define SBI_v_0_2_CALL_3(which, arg0, arg1, arg2) SBI_v_0_2_CALL(which, arg0, arg1, arg2)
 static inline bool sbi_probe_pma(void)
 {
-	return SBI_CALL_0(SBI_PROBE_PMA);
+	return SBI_v_0_2_CALL_0(SBI_PROBE_PMA);
 }
 
 static inline void sbi_set_pma(phys_addr_t offset, unsigned long vaddr,
 			       size_t size)
 {
-	SBI_CALL_3(SBI_SET_PMA, offset, vaddr, size);
+	SBI_v_0_2_CALL_3(SBI_SET_PMA, offset, vaddr, size);
 }
 
 static inline void sbi_free_pma(unsigned long vaddr)
 {
-	SBI_CALL_1(SBI_FREE_PMA, vaddr);
+	SBI_v_0_2_CALL_1(SBI_FREE_PMA, vaddr);
 }
 
 static inline void sbi_set_reset_vec(int val)
 {
-	SBI_CALL_1(SBI_SET_RESET_VEC, val);
+	SBI_v_0_2_CALL_1(SBI_SET_RESET_VEC, val);
 }
 
 static inline void sbi_restart(int val)
 {
-	SBI_CALL_1(SBI_RESTART, val);
+	SBI_v_0_2_CALL_1(SBI_RESTART, val);
 }
 
-static inline void sbi_set_reset_vec(int val)
+static inline void sbi_write_powerbrake(int val)
 {
-	SBI_CALL_1(SBI_SET_RESET_VEC, val);
+	SBI_v_0_2_CALL_1(SBI_WRITE_POWERBRAKE, val);
+}
+
+static inline int sbi_read_powerbrake(void)
+{
+	return SBI_v_0_2_CALL_0(SBI_READ_POWERBRAKE);
+}
+
+static inline void sbi_set_trigger(unsigned int type, uintptr_t data, int enable)
+{
+	SBI_v_0_2_CALL_3(SBI_TRIGGER, type, data, enable);
 }
 
 static inline void sbi_console_putchar(int ch)
@@ -153,7 +170,7 @@ static inline void sbi_remote_sfence_vma(const unsigned long *hart_mask,
 					 unsigned long start,
 					 unsigned long size)
 {
-	SBI_CALL_3(SBI_REMOTE_SFENCE_VMA, hart_mask, start, size);
+	SBI_CALL_1(SBI_REMOTE_SFENCE_VMA, hart_mask);
 }
 
 static inline void sbi_remote_sfence_vma_asid(const unsigned long *hart_mask,
@@ -161,7 +178,7 @@ static inline void sbi_remote_sfence_vma_asid(const unsigned long *hart_mask,
 					      unsigned long size,
 					      unsigned long asid)
 {
-	SBI_CALL_4(SBI_REMOTE_SFENCE_VMA_ASID, hart_mask, start, size, asid);
+	SBI_CALL_1(SBI_REMOTE_SFENCE_VMA_ASID, hart_mask);
 }
 
 #endif

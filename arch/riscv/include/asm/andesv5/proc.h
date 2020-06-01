@@ -7,18 +7,21 @@ void cpu_icache_disable(void *info);
 void cpu_dcache_enable(void *info);
 void cpu_dcache_disable(void *info);
 uint32_t cpu_l2c_ctl_status(void);
-void cpu_l2c_enable(void);
 void cpu_l2c_disable(void);
-unsigned long get_non_blocking_status(void);
-unsigned long get_write_around_status(void);
-void sbi_enable_non_blocking_load_store(void);
-void sbi_disable_non_blocking_load_store(void);
+
+int get_write_around_status(void);
 void sbi_enable_write_around(void);
 void sbi_disable_write_around(void);
+
 void sbi_enable_l1i_cache(void);
 void sbi_disable_l1i_cache(void);
 void sbi_enable_l1d_cache(void);
 void sbi_disable_l1d_cache(void);
+
+int get_non_blocking_status(void);
+void sbi_enable_non_blocking_load_store(void);
+void sbi_disable_non_blocking_load_store(void);
+
 void sbi_set_mcache_ctl(unsigned long input);
 void sbi_set_mmisc_ctl(unsigned long input);
 
@@ -32,7 +35,6 @@ extern phys_addr_t pa_msb;;
 #define dma_remap(pa, size) ioremap((pa|(pa_msb << PAGE_SHIFT)), size)
 
 #define dma_unmap(vaddr) iounmap((void __force __iomem *)vaddr)
-
 
 /*
  * struct andesv5_cache_info

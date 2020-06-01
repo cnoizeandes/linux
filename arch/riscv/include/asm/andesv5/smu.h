@@ -61,9 +61,9 @@
 #define L2_WBINVAL_COMMAND      0x12
 
 struct atc_smu {
-	void __iomem *base;
-	struct resource *res;
-	spinlock_t lock;
+        void __iomem *base;
+        struct resource *res;
+        spinlock_t lock;
 };
 
 extern unsigned int *wake_mask;
@@ -76,11 +76,11 @@ void andes_suspend2ram(void);
 
 static inline void sbi_suspend_prepare(char main_core, char enable)
 {
-	SBI_CALL_2(SBI_SUSPEND_PREPARE, main_core, enable);
+	SBI_v_0_2_CALL_2(SBI_SUSPEND_PREPARE, main_core, enable);
 }
 
 static inline void sbi_suspend_mem(void)
 {
-	SBI_CALL_0(SBI_SUSPEND_MEM);
+	SBI_v_0_2_CALL_0(SBI_SUSPEND_MEM);
 }
 #endif
