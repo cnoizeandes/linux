@@ -27,19 +27,19 @@ ENTRY(__asm_copy_from_user)
 
 word_copy:
 	fixup REG_L, t2, (a1), 10f
-	addi a1, a1, SZREG
-	addi t0, t0, -1			/* Decrease word count */
 	fixup REG_S, t2, (a0), 10f
+	addi a1, a1, SZREG
 	addi a0, a0, SZREG
+	addi t0, t0, -1			/* Decrease word count */
 	bnez t0, word_copy		/* Continue looping to copy all words */
 	beqz t1, exit			/* Done word copy and no left bytes to copy */
 
 byte_copy:
 	fixup lbu, t2, (a1), 10f
-	addi a1, a1, 1
-	addi t1, t1, -1			/* Decrease byte count */
 	fixup  sb, t2, (a0), 10f
+	addi a1, a1, 1
 	addi a0, a0, 1
+	addi t1, t1, -1			/* Decrease byte count */
 	bnez t1, byte_copy		/* Contine looping to clear all left bytes */
 
 exit:
