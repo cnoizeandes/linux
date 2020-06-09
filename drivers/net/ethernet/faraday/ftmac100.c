@@ -63,6 +63,10 @@
 #define FTMAC100_CURRENT_TX_DESC_INDEX(priv) (priv->tx_pointer);
 #define FTMAC100_CURRENT_CLEAN_TX_DESC_INDEX(priv) (priv->tx_clean_pointer);
 
+/* ftmac100_debug parameters */
+extern unsigned int FTMAC100_DEBUG;
+extern unsigned int FTMAC100_INCR;
+
 /******************************************************************************
  * private data
  *****************************************************************************/
@@ -203,8 +207,8 @@ static int ftmac100_start_hw(struct ftmac100 *priv)
 	iowrite32(FTMAC100_APTC_RXPOLL_CNT(1), priv->base + FTMAC100_OFFSET_APTC);
 
 	// Enable DMA Burst & RXFIFO threshold
-	iowrite32(FTMAC100_DBLAC_RX_THR_EN 	|  /* Enable fifo threshold arb */
-			  FTMAC100_DBLAC_INCR16_EN 	|  /* Enable INCR[4/8/16] DMA Burst, this option solve RX RPKT_LOST issue*/
+	iowrite32(FTMAC100_DBLAC_RX_THR_EN      |  /* Enable fifo threshold arb */
+		  FTMAC100_INCR                 |  /* Enable INCR[4/8/16] DMA Burst, this option solve RX RPKT_LOST issue*/
 		  FTMAC100_DBLAC_RXFIFO_HTHR(6) |  /* 6/8 of FIFO high threshold */
 		  FTMAC100_DBLAC_RXFIFO_LTHR(2),   /* 2/8 of FIFO low threshold */
 		  priv->base + FTMAC100_OFFSET_DBLAC);
@@ -947,7 +951,7 @@ static int ftmac100_poll(struct napi_struct *napi, int budget)
 
 	if (status & (FTMAC100_INT_NORXBUF | FTMAC100_INT_RPKT_LOST |
 		      FTMAC100_INT_AHB_ERR | FTMAC100_INT_PHYSTS_CHG)) {
-		if (net_ratelimit())
+		if (net_ratelimit() && FTMAC100_DEBUG)
 			netdev_info(netdev, "[ISR] = 0x%x: %s%s%s%s\n", status,
 				    status & FTMAC100_INT_NORXBUF ? "NORXBUF " : "",
 				    status & FTMAC100_INT_RPKT_LOST ? "RPKT_LOST " : "",
