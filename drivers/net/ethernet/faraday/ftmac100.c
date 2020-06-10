@@ -202,6 +202,18 @@ static int ftmac100_start_hw(struct ftmac100 *priv)
 
 	iowrite32(FTMAC100_APTC_RXPOLL_CNT(1), priv->base + FTMAC100_OFFSET_APTC);
 
+	// Enable DMA Burst & RXFIFO threshold
+	iowrite32(FTMAC100_DBLAC_RX_THR_EN 	|  /* Enable fifo threshold arb */
+			  FTMAC100_DBLAC_INCR16_EN 	|  /* Enable INCR[4/8/16] DMA Burst, this option solve RX RPKT_LOST issue*/
+		  FTMAC100_DBLAC_RXFIFO_HTHR(6) |  /* 6/8 of FIFO high threshold */
+		  FTMAC100_DBLAC_RXFIFO_LTHR(2),   /* 2/8 of FIFO low threshold */
+		  priv->base + FTMAC100_OFFSET_DBLAC);
+
+	// Pending interrupt until receive packets reach threshold
+	iowrite32(FTMAC100_ITC_RXINT_THR(1) |
+		  FTMAC100_ITC_TXINT_THR(1),
+		  priv->base + FTMAC100_OFFSET_ITC);
+
 	ftmac100_set_mac(priv, netdev->dev_addr);
 
 	iowrite32(MACCR_ENABLE_ALL, priv->base + FTMAC100_OFFSET_MACCR);
@@ -986,6 +998,14 @@ static int ftmac100_open(struct net_device *netdev)
 		netdev_err(netdev, "failed to request irq %d\n", priv->irq);
 		goto err_irq;
 	}
+
+	// set sysctl ip fragmentation parameters.
+	// sysctl -w net.ipv4.ipfrag_time
+	// sysctl -w net.ipv4.ipfrag_high_thresh
+	struct net *net;
+	net = dev_net(netdev);
+	net->ipv4.fqdir->timeout= (5* HZ);         		/* Decrease fragment timeout, 30 -> 5 */
+	net->ipv4.fqdir->high_thresh= 8 * 1024 * 1024;  /* Increase fragment buffer size, 4M -> 8M */
 
 	priv->rx_pointer = 0;
 	priv->tx_clean_pointer = 0;
