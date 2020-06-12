@@ -20,7 +20,7 @@ ENTRY(__copy_user)
 	csrs sstatus, t6
 
 	beqz a2, exit			/* if n is zero just exit */
-	srli t0, a2, 2   		/* t0: number of word to copy */
+	srli t0, a2, LGREG   	/* t0: number of word to copy */
 	andi t1, a2, SZREG -1	/* t1: bytes less than a word to copy */
 	beqz t0, byte_copy		/* Only less than a word to byte copy */
 
