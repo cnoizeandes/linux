@@ -1,7 +1,7 @@
 #include <asm/io.h>
 #include <asm/page.h>
 
-int cpu_l1c_status(void);
+long cpu_l1c_status(void);
 void cpu_icache_enable(void *info);
 void cpu_icache_disable(void *info);
 void cpu_dcache_enable(void *info);
@@ -9,8 +9,8 @@ void cpu_dcache_disable(void *info);
 uint32_t cpu_l2c_ctl_status(void);
 void cpu_l2c_enable(void);
 void cpu_l2c_disable(void);
-unsigned long get_non_blocking_status(void);
-unsigned long get_write_around_status(void);
+long get_non_blocking_status(void);
+long get_write_around_status(void);
 void sbi_enable_non_blocking_load_store(void);
 void sbi_disable_non_blocking_load_store(void);
 void sbi_enable_write_around(void);

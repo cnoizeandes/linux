@@ -52,9 +52,9 @@ static ssize_t proc_read_sbi_en(struct file *file, char __user *userbuf,
     } else if (!strncmp(file->f_path.dentry->d_name.name, "l1d_prefetch", 12)) {
         ret = sprintf(buf, "l1d_prefetch: %s\n", (get_write_around_status() & MCACHE_CTL_L1D_PREFETCH_EN) ? "Enabled" : "Disabled");
     } else if (!strncmp(file->f_path.dentry->d_name.name, "mcache_ctl", 10)) {
-        ret = sprintf(buf, "mcache_ctl: %x\n", get_write_around_status());
+        ret = sprintf(buf, "mcache_ctl: %lx\n", get_write_around_status());
     } else if (!strncmp(file->f_path.dentry->d_name.name, "mmisc_ctl", 9)) {
-        ret = sprintf(buf, "mmisc_ctl: %x\n", get_non_blocking_status());
+        ret = sprintf(buf, "mmisc_ctl: %lx\n", get_non_blocking_status());
     } else {
 		return -EFAULT;
     }
