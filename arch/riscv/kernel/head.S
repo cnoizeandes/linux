@@ -56,7 +56,7 @@ relocate:
 	/* Point stvec to virtual address of intruction after satp write */
 	la a2, 1f
 	add a2, a2, a1
-	csrw CSR_TVEC, a2
+	csrw CSR_STVEC, a2
 
 	/* Compute satp for kernel page tables, but don't load it yet */
 	srl a2, a0, PAGE_SHIFT
@@ -78,7 +78,7 @@ relocate:
 1:
 	/* Set trap vector to spin forever to help debug */
 	la a0, .Lsecondary_park
-	csrw CSR_TVEC, a0
+	csrw CSR_STVEC, a0
 
 	/* Reload the global pointer */
 .option push
@@ -101,8 +101,8 @@ relocate:
 	.global secondary_start_sbi
 secondary_start_sbi:
 	/* Mask all interrupts */
-	csrw CSR_IE, zero
-	csrw CSR_IP, zero
+	csrw sie, zero
+	csrw sip, zero
 
 	/* Load the global pointer */
 	.option push
@@ -115,11 +115,11 @@ secondary_start_sbi:
 	 * floating point in kernel space
 	 */
 	li t0, SR_FS
-	csrc CSR_STATUS, t0
+	csrc sstatus, t0
 
 	/* Set trap vector to spin forever to help debug */
 	la a3, .Lsecondary_park
-	csrw CSR_TVEC, a3
+	csrw CSR_STVEC, a3
 
 	slli a3, a0, LGREG
 	la a4, __cpu_up_stack_pointer
@@ -150,8 +150,8 @@ END(_start)
 	__INIT
 ENTRY(_start_kernel)
 	/* Mask all interrupts */
-	csrw CSR_SIE, zero
-	csrw CSR_SIP, zero
+	csrw sie, zero
+	csrw sip, zero
 
 	/* Load the global pointer */
 .option push
@@ -164,7 +164,7 @@ ENTRY(_start_kernel)
 	 * floating point in kernel space
 	 */
 	li t0, SR_FS
-	csrc CSR_SSTATUS, t0
+	csrc sstatus, t0
 
 #ifdef CONFIG_SMP
 	li t0, CONFIG_NR_CPUS
