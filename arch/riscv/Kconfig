@@ -78,6 +78,10 @@ config ARCH_MMAP_RND_BITS_MAX
 config MMU
 	def_bool y
 
+config RISCV_SBI
+	bool
+	default y
+
 config ZONE_DMA32
 	bool
 	default y if 64BIT
