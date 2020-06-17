@@ -824,7 +824,7 @@ void riscv_perf_interrupt(struct pt_regs *regs)
                 panic("Unexpected Perf interrupt\n");
 
         perf_irq(regs);
-        SBI_CALL_0(SBI_SET_PFM);
+		SBI_v_0_2_CALL_0(SBI_SET_PFM);
 }
 
 perf_irq_t reserve_pmc_hardware(perf_irq_t new_perf_irq)
@@ -1005,7 +1005,7 @@ void init_cpu_pmu(void *arg)
 {
 	// enable S-mode local interrupt and M-mode interrupt
 	csr_write(slie, PFMOVF_MASK);
-	SBI_CALL_0(SBI_SET_PFM);
+	SBI_v_0_2_CALL_0(SBI_SET_PFM);
 }
 
 int __init init_hw_perf_events(void)
