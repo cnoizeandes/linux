@@ -171,6 +171,11 @@ static inline unsigned long sbi_minor_version(void)
 }
 
 int sbi_err_map_linux_errno(int err);
+
+void sbi_suspend_prepare(char main_core, char enable);
+void sbi_suspend_mem(void);
+void sbi_restart(int cpu_num);
+
 #else /* CONFIG_RISCV_SBI */
 /* stubs for code that is only reachable under IS_ENABLED(CONFIG_RISCV_SBI): */
 void sbi_set_timer(uint64_t stime_value);

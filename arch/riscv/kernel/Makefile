@@ -50,4 +50,6 @@ obj-$(CONFIG_SMP) += cpu_ops_sbi.o
 endif
 obj-$(CONFIG_HOTPLUG_CPU)	+= cpu-hotplug.o
 
+obj-$(CONFIG_PM)		+= pm.o sleep.o
+
 clean:

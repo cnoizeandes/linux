@@ -8,6 +8,7 @@
 #include <linux/reboot.h>
 
 #include <asm/tlbflush.h>
+#include <asm/sbi.h>
 #include <asm/andesv5/smu.h>
 #include <asm/andesv5/proc.h>
 
@@ -73,6 +74,8 @@ void andes_suspend2ram(void)
 	int ready_cpu[NR_CPUS] = {0};
 #ifdef CONFIG_SMP
 	int id = smp_processor_id();
+#else
+	int id = 0;
 #endif
 	// Disable higher privilege's non-wakeup event
 	sbi_suspend_prepare(true, false);
