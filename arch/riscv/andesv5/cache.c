@@ -155,6 +155,14 @@ long get_non_blocking_status(void)
 	ret = sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_GET_MMISC_CTL_STATUS, 0, 0, 0, 0, 0, 0);
 	return ret.value;
 }
+void sbi_set_mcache_ctl(unsigned long input)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_MCACHE_CTL, input, 0, 0, 0, 0, 0);
+	local_irq_restore(flags);
+}
 EXPORT_SYMBOL(sbi_set_mcache_ctl);
 
 void sbi_set_mmisc_ctl(unsigned long input)
@@ -162,19 +170,10 @@ void sbi_set_mmisc_ctl(unsigned long input)
        unsigned long flags;
 
        local_irq_save(flags);
-       sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_NON_BLOCKING_LOAD_STORE, 1, 0, 0, 0, 0, 0);
+       sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_NON_BLOCKING_LOAD_STORE, input, 0, 0, 0, 0, 0);
        local_irq_restore(flags);
 }
 EXPORT_SYMBOL(sbi_set_mmisc_ctl);
-
-int get_non_blocking_status(void)
-{
-       unsigned long flags;
-
-       local_irq_save(flags);
-       sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_NON_BLOCKING_LOAD_STORE, 0, 0, 0, 0, 0, 0);
-       local_irq_restore(flags);
-}
 
 /*write around*/
 long get_write_around_status(void)
@@ -184,7 +183,8 @@ long get_write_around_status(void)
 	return ret.value;
 }
 
-void sbi_disable_non_blocking_load_store(void)
+
+void sbi_enable_non_blocking_load_store(void)
 {
        unsigned long flags;
 
@@ -193,7 +193,7 @@ void sbi_disable_non_blocking_load_store(void)
        local_irq_restore(flags);
 }
 
-int get_write_around_status(void)
+void sbi_disable_non_blocking_load_store(void)
 {
        unsigned long flags;
 
@@ -207,7 +207,7 @@ void sbi_enable_write_around(void)
 	unsigned long flags;
 
        local_irq_save(flags);
-       sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_MCACHE_CTL, input, 0, 0, 0, 0, 0);
+       sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_MCACHE_CTL, 1, 0, 0, 0, 0, 0);
        local_irq_restore(flags);
 }
 
@@ -216,10 +216,9 @@ void sbi_disable_write_around(void)
        unsigned long flags;
 
        local_irq_save(flags);
-       sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_MMISC_CTL, input, 0, 0, 0, 0, 0);
+       sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_MMISC_CTL, 0, 0, 0, 0, 0, 0);
        local_irq_restore(flags);
 }
-EXPORT_SYMBOL(sbi_set_mmisc_ctl);
 /* L1 Cache Prefetch */
 
 void sbi_enable_l1i_cache(void)
