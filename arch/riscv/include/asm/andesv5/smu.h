@@ -61,9 +61,9 @@
 #define L2_WBINVAL_COMMAND      0x12
 
 struct atc_smu {
-	void __iomem *base;
-	struct resource *res;
-	spinlock_t lock;
+        void __iomem *base;
+        struct resource *res;
+        spinlock_t lock;
 };
 
 extern unsigned int *wake_mask;

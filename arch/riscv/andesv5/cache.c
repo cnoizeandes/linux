@@ -155,8 +155,9 @@ long get_non_blocking_status(void)
 	ret = sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_GET_MMISC_CTL_STATUS, 0, 0, 0, 0, 0, 0);
 	return ret.value;
 }
+EXPORT_SYMBOL(sbi_set_mcache_ctl);
 
-void sbi_enable_non_blocking_load_store(void)
+void sbi_set_mmisc_ctl(unsigned long input)
 {
        unsigned long flags;
 
@@ -164,8 +165,9 @@ void sbi_enable_non_blocking_load_store(void)
        sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_NON_BLOCKING_LOAD_STORE, 1, 0, 0, 0, 0, 0);
        local_irq_restore(flags);
 }
+EXPORT_SYMBOL(sbi_set_mmisc_ctl);
 
-void sbi_disable_non_blocking_load_store(void)
+int get_non_blocking_status(void)
 {
        unsigned long flags;
 
@@ -182,7 +184,7 @@ long get_write_around_status(void)
 	return ret.value;
 }
 
-void sbi_enable_write_around(void)
+void sbi_disable_non_blocking_load_store(void)
 {
        unsigned long flags;
 
@@ -191,7 +193,7 @@ void sbi_enable_write_around(void)
        local_irq_restore(flags);
 }
 
-void sbi_disable_write_around(void)
+int get_write_around_status(void)
 {
        unsigned long flags;
 
@@ -200,17 +202,16 @@ void sbi_disable_write_around(void)
        local_irq_restore(flags);
 }
 
-void sbi_set_mcache_ctl(unsigned long input)
+void sbi_enable_write_around(void)
 {
-       unsigned long flags;
+	unsigned long flags;
 
        local_irq_save(flags);
        sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_MCACHE_CTL, input, 0, 0, 0, 0, 0);
        local_irq_restore(flags);
 }
-EXPORT_SYMBOL(sbi_set_mcache_ctl);
 
-void sbi_set_mmisc_ctl(unsigned long input)
+void sbi_disable_write_around(void)
 {
        unsigned long flags;
 
@@ -219,11 +220,11 @@ void sbi_set_mmisc_ctl(unsigned long input)
        local_irq_restore(flags);
 }
 EXPORT_SYMBOL(sbi_set_mmisc_ctl);
-
 /* L1 Cache Prefetch */
+
 void sbi_enable_l1i_cache(void)
 {
-        unsigned long flags;
+	unsigned long flags;
 
         local_irq_save(flags);
         sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_L1CACHE_I_PREFETCH, 1, 0, 0, 0, 0, 0);
@@ -232,7 +233,7 @@ void sbi_enable_l1i_cache(void)
 
 void sbi_disable_l1i_cache(void)
 {
-        unsigned long flags;
+	unsigned long flags;
 
         local_irq_save(flags);
         sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_L1CACHE_I_PREFETCH, 0, 0, 0, 0, 0, 0);
@@ -241,7 +242,7 @@ void sbi_disable_l1i_cache(void)
 
 void sbi_enable_l1d_cache(void)
 {
-        unsigned long flags;
+	unsigned long flags;
 
         local_irq_save(flags);
         sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_L1CACHE_D_PREFETCH, 1, 0, 0, 0, 0, 0);
@@ -255,8 +256,7 @@ void sbi_disable_l1d_cache(void)
         local_irq_save(flags);
         sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_L1CACHE_D_PREFETCH, 0, 0, 0, 0, 0, 0);
         local_irq_restore(flags);
- }
-
+}
 /* L1 Cache */
 long cpu_l1c_status(void)
 {

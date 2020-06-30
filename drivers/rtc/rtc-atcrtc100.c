@@ -224,7 +224,7 @@ static int atc_rtc_probe(struct platform_device *pdev)
 
 	spin_lock_init(&rtc->lock);
 
-	rtc->alarm_irq = platform_get_irq(pdev, 2);
+	rtc->alarm_irq = platform_get_irq(pdev, 1);
 	if (rtc->alarm_irq < 0)
 		goto err_exit;
 
@@ -280,9 +280,8 @@ static int atc_rtc_probe(struct platform_device *pdev)
 	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source"))
 		device_init_wakeup(&pdev->dev, true);
 
-	rtc->rtc_dev =
-		rtc_device_register(DRV_NAME, &pdev->dev,
-				    &rtc_ops, THIS_MODULE);
+	rtc->rtc_dev = devm_rtc_allocate_device(&pdev->dev);
+	rtc->rtc_dev->ops = &rtc_ops;
 
 	if (IS_ERR(rtc->rtc_dev)) {
 		ret = PTR_ERR(rtc->rtc_dev);
@@ -291,6 +290,11 @@ static int atc_rtc_probe(struct platform_device *pdev)
 
 	rtc->rtc_dev->max_user_freq = 256;
 	rtc->rtc_dev->irq_freq = 1;
+
+	ret = rtc_register_device(rtc->rtc_dev);
+	if (ret)
+		goto err_unmap;
+
 	return 0;
 
 err_unmap:
@@ -309,7 +313,6 @@ static int atc_rtc_remove(struct platform_device *pdev)
 {
 	struct atc_rtc *rtc = platform_get_drvdata(pdev);
 
-	rtc_device_unregister(rtc->rtc_dev);
 	/*
 	 * Because generic rtc will not execute rtc_device_release()
 	 * when call rtc_device_unregister(),

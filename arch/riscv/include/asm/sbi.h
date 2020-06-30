@@ -1,6 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (C) 2015 Regents of the University of California
  * Copyright (c) 2020 Western Digital Corporation or its affiliates.
  */
 
