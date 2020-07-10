@@ -80,6 +80,7 @@ enum sbi_ext_andes_fid {
           SBI_EXT_ANDES_WRITE_POWERBRAKE,
           SBI_EXT_ANDES_SUSPEND_PREPARE,
           SBI_EXT_ANDES_SUSPEND_MEM,
+          SBI_EXT_ANDES_SET_SUSPEND_MODE,
           SBI_EXT_ANDES_RESTART,
           SBI_EXT_ANDES_RESET_VEC,
           SBI_EXT_ANDES_SET_PMA,
@@ -175,6 +176,7 @@ int sbi_err_map_linux_errno(int err);
 void sbi_suspend_prepare(char main_core, char enable);
 void sbi_suspend_mem(void);
 void sbi_restart(int cpu_num);
+void sbi_set_suspend_mode(int suspend_mode);
 
 #else /* CONFIG_RISCV_SBI */
 /* stubs for code that is only reachable under IS_ENABLED(CONFIG_RISCV_SBI): */

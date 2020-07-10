@@ -27,3 +27,9 @@ void sbi_restart(int cpu_num)
 	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_RESTART, cpu_num, 0, 0, 0, 0, 0);
 }
 EXPORT_SYMBOL(sbi_restart);
+
+void sbi_set_suspend_mode(int suspend_mode)
+{
+	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_SUSPEND_MODE, suspend_mode, 0, 0, 0, 0, 0);
+}
+EXPORT_SYMBOL(sbi_set_suspend_mode);

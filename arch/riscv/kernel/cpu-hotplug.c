@@ -14,6 +14,8 @@
 #include <asm/cpu_ops.h>
 #include <asm/sbi.h>
 
+#include <asm/andesv5/smu.h>
+
 void cpu_stop(void);
 void arch_cpu_idle_dead(void)
 {
@@ -81,6 +83,9 @@ void cpu_stop(void)
 
 	(void)cpu_report_death();
 
+#ifdef CONFIG_ATCSMU
+	atcsmu100_set_suspend_mode();
+#endif
 	cpu_ops[smp_processor_id()]->cpu_stop();
 	/* It should never reach here */
 	BUG();

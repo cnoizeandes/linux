@@ -6,11 +6,16 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/reboot.h>
+#include <linux/suspend.h>
 
 #include <asm/tlbflush.h>
 #include <asm/sbi.h>
+#include <asm/csr.h>
 #include <asm/andesv5/smu.h>
 #include <asm/andesv5/proc.h>
+
+// define in riscv/kernel/pm.c
+extern int suspend_begin;
 
 struct atc_smu atcsmu;
 int get_pd_type(unsigned int cpu)
@@ -35,9 +40,19 @@ void set_wakeup_enable(int cpu, unsigned int events)
 {
 	struct atc_smu *smu = &atcsmu;
 
+	if(cpu!=0){
+		unsigned int val1 = readl((void *)(smu->base + CN_PCS_WE_OFF(cpu)));
+		printk("1. val=0x%x\n",val1);
+	}
+	
 	if (cpu == 0)
 		events |= (1 << PCS_WAKE_DBG_OFF);
 	writel(events, (void *)(smu->base + CN_PCS_WE_OFF(cpu)));
+
+	if(cpu!=0){
+		unsigned int val2 = readl((void *)(smu->base + CN_PCS_WE_OFF(cpu)));
+		printk("2. val=0x%x\n",val2);
+	}
 }
 
 void set_sleep(int cpu, unsigned char sleep)
@@ -66,6 +81,7 @@ void set_sleep(int cpu, unsigned char sleep)
 
 }
 
+// main hart
 extern int num_cpus;
 void andes_suspend2ram(void)
 {
@@ -106,6 +122,8 @@ void andes_suspend2ram(void)
 	sbi_suspend_prepare(true, true);
 }
 
+
+// main hart
 void andes_suspend2standby(void)
 {
 	unsigned int cpu, status, type;
@@ -152,6 +170,19 @@ void andes_suspend2standby(void)
 	// enable privilege
 	sbi_suspend_prepare(true, true);
 }
+
+#ifdef CONFIG_ATCSMU
+// other harts
+void atcsmu100_set_suspend_mode(void){
+	int cpu = smp_processor_id();
+
+	if (suspend_begin == PM_SUSPEND_MEM) {
+		sbi_set_suspend_mode(DeepSleepMode);
+	}else if(suspend_begin == PM_SUSPEND_STANDBY){
+		sbi_set_suspend_mode(LightSleepMode);
+	}
+}
+#endif
 
 static int atcsmu100_restart_call(struct notifier_block *nb,
                                  unsigned long action, void *data)
