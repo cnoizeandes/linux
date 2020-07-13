@@ -90,6 +90,11 @@
 #define CSR_TIMEH		0xc81
 #define CSR_INSTRETH		0xc82
 
+/* IE/IP (Supervisor/Machine Interrupt Enable/Pending) flags */
+#define IE_SIE         (_AC(0x1, UL) << IRQ_S_SOFT)
+#define IE_TIE         (_AC(0x1, UL) << IRQ_S_TIMER)
+#define IE_EIE         (_AC(0x1, UL) << IRQ_S_EXT)
+
 #ifndef __ASSEMBLY__
 
 #define csr_swap(csr, val)					\

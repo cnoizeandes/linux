@@ -157,5 +157,5 @@ void trap_init(void)
 	/* Set the exception vector address */
 	csr_write(CSR_STVEC, &handle_exception);
 	/* Enable all interrupts but timer interrupt*/
-	csr_set(CSR_SIE, SIE_SSIE | SIE_SEIE);
+	csr_set(CSR_SIE, SIE_SSIE);
 }
