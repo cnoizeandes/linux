@@ -39,20 +39,9 @@ int get_pd_status(unsigned int cpu)
 void set_wakeup_enable(int cpu, unsigned int events)
 {
 	struct atc_smu *smu = &atcsmu;
-
-	if(cpu!=0){
-		unsigned int val1 = readl((void *)(smu->base + CN_PCS_WE_OFF(cpu)));
-		printk("1. val=0x%x\n",val1);
-	}
-	
 	if (cpu == 0)
 		events |= (1 << PCS_WAKE_DBG_OFF);
 	writel(events, (void *)(smu->base + CN_PCS_WE_OFF(cpu)));
-
-	if(cpu!=0){
-		unsigned int val2 = readl((void *)(smu->base + CN_PCS_WE_OFF(cpu)));
-		printk("2. val=0x%x\n",val2);
-	}
 }
 
 void set_sleep(int cpu, unsigned char sleep)
