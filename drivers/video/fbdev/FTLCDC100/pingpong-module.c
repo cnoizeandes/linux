@@ -53,7 +53,7 @@ static int faradayfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 
 		off += fbi->screen_dma & PAGE_MASK;
 		vma->vm_pgoff = off >> PAGE_SHIFT;
-		if(!info->device->archdata.dma_coherent){
+		if(!info->device->dma_coherent){
 			vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 		}
 		ret = remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
