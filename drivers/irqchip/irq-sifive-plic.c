@@ -120,11 +120,8 @@ static void plic_irq_mask(struct irq_data *d)
 
 static int plic_set_wake(struct irq_data *d, unsigned int on)
 {
-	u32 bit[MAX_USE_REGS];
 	u32 offset = d->hwirq / 32;
 	int cpu;
-
-	bit[offset] = 1 << (d->hwirq % 32);
 
 	if (on)
 		__assign_bit(d->hwirq, (unsigned long *)wake_mask, true);
@@ -138,28 +135,10 @@ static int plic_set_wake(struct irq_data *d, unsigned int on)
 		if (handler->present){
 			unsigned int int_mask[MAX_USE_REGS];
 			u32 __iomem *reg = handler->enable_base + (d->hwirq / 32) * sizeof(u32);
-			u32 target_area = cpu * (MAX_USE_REGS);
 
 			int_mask[offset] = readl(reg);
-			if (on) {
-				if (int_mask[offset] & bit[offset])
-					__assign_bit(d->hwirq,
-					(unsigned long *)&orig[target_area],
-					true);
-				else
-					__assign_bit(d->hwirq,
-					(unsigned long *)&orig[target_area],
-					false);
-
+			if (on)
 				__assign_bit(d->hwirq, (unsigned long *)int_mask, true);
-			} else {
-				if (!(orig[target_area] & bit[offset]))
-					__assign_bit(d->hwirq,
-					(unsigned long *)int_mask, false);
-
-				__assign_bit(d->hwirq, (unsigned long *)&orig[target_area],
-				false);
-			}
 			writel(int_mask[offset], reg);
 		}
 			
