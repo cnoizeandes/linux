@@ -134,7 +134,7 @@ void arch_dma_free(struct device *dev, size_t size, void *vaddr,
        void *kvaddr = phys_to_virt(dma_to_phys(dev, handle));
 
        size = PAGE_ALIGN(size);
-       dma_unmap(vaddr);
+       iounmap(vaddr);
        dma_direct_free_pages(dev, size, kvaddr, handle, attrs);
 
        return;

@@ -29,12 +29,6 @@ void cpu_dma_wb_range(unsigned long start, unsigned long end);
 void cpu_l2c_inval_range(unsigned long pa, unsigned long size);
 void cpu_l2c_wb_range(unsigned long pa, unsigned long size);
 
-extern phys_addr_t pa_msb;;
-
-#define dma_remap(pa, size) ioremap((pa|(pa_msb << PAGE_SHIFT)), size)
-
-#define dma_unmap(vaddr) iounmap((void __force __iomem *)vaddr)
-
 /*
  * struct andesv5_cache_info
  * The member of this struct is dupilcated to some content of struct cacheinfo

@@ -39,3 +39,23 @@ void sbi_set_reset_vec(int val)
 	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_RESET_VEC, val, 0, 0, 0, 0, 0);
 }
 EXPORT_SYMBOL(sbi_set_reset_vec);
+
+void sbi_set_pma(phys_addr_t offset, unsigned long vaddr, size_t size)
+{
+	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_PMA, offset, vaddr, size, 0, 0, 0);
+}
+EXPORT_SYMBOL(sbi_set_pma);
+
+void sbi_free_pma(unsigned long vaddr)
+{
+	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_FREE_PMA, vaddr, 0, 0, 0, 0, 0);
+}
+EXPORT_SYMBOL(sbi_free_pma);
+
+long sbi_probe_pma(void)
+{
+	struct sbiret ret;
+	ret = sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_PROBE_PMA, 0, 0, 0, 0, 0, 0);
+	return ret.value;
+}
+EXPORT_SYMBOL(sbi_probe_pma);
