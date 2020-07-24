@@ -1,6 +1,6 @@
 #include <linux/io.h>
 
-void *fmem_alloc(size_t size, dma_addr_t *dma_handle)
+void *fmem_alloc(size_t size, dma_addr_t *dma_handle, bool has_dma_coherent)
 {
 	struct page *page;
 	void *cpu_addr = NULL;
@@ -11,9 +11,13 @@ void *fmem_alloc(size_t size, dma_addr_t *dma_handle)
 	}
 	*dma_handle = page_to_phys(page);
 
-	if ((cpu_addr = ioremap_nocache(*dma_handle, size))) {
+	if(!has_dma_coherent){
+		cpu_addr = ioremap_nocache(*dma_handle, size);
+	}else{
+		cpu_addr = ioremap(*dma_handle, size);
+	}
 
-
+	if (cpu_addr) {
 		do {
 			SetPageReserved(page);
 			page++;
@@ -79,8 +83,10 @@ static int __init faradayfb_map_video_memory(struct fb_info *info)
 {
 	struct faradayfb_info *fbi = info->par;
 
+	bool dma_coherent = info->device->dma_coherent;
+
 	fbi->map_size = PAGE_ALIGN(info->fix.smem_len);
-	fbi->map_cpu = fmem_alloc(fbi->map_size, &fbi->map_dma);
+	fbi->map_cpu = fmem_alloc(fbi->map_size, &fbi->map_dma, dma_coherent);
 
 	if (fbi->map_cpu) {
 

@@ -69,6 +69,7 @@ static void __iomem *__ioremap_caller(phys_addr_t addr, size_t size,
 #define MAX_PMA 16
 unsigned long pma_used[MAX_PMA]={0};
 #endif
+extern phys_addr_t pa_msb;
 
 void __iomem *ioremap(phys_addr_t offset, size_t size)
 {
@@ -86,20 +87,22 @@ void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
 	ret =  __ioremap_caller(offset, size, pgprot,
 		__builtin_return_address(0));
 #ifdef CONFIG_PMA
-	/* Start to setting PMA */
-	/* Check whether the value of size is power of 2 */
-	if ((size & (size-1)) != 0) {
-		printk("The value of size is not power of 2\n");
-		BUG();
-	}
-	/* Setting PMA register */
-	for (i = 0; i < MAX_PMA; i++) {
-		if (!pma_used[i]) {
-			pma_used[i] = (unsigned long)ret;
-			break;
+	if(!pa_msb){	// PMA enable --> pa_msb==0 --> sbi_set_pma()
+		/* Start to setting PMA */
+		/* Check whether the value of size is power of 2 */
+		if ((size & (size-1)) != 0) {
+			printk("The value of size is not power of 2\n");
+			BUG();
 		}
+		/* Setting PMA register */
+		for (i = 0; i < MAX_PMA; i++) {
+			if (!pma_used[i]) {
+				pma_used[i] = (unsigned long)ret;
+				break;
+			}
+		}
+		sbi_set_pma(offset, (unsigned long)ret, size);
 	}
-	sbi_set_pma(offset, (unsigned long)ret, size);
 #endif
 	return ret;
 }
@@ -117,12 +120,14 @@ void iounmap(volatile void __iomem *addr)
 
 	vunmap((void *)((unsigned long)addr & PAGE_MASK));
 #ifdef CONFIG_PMA
-	/* Free PMA regitser */
-	for (i = 0; i < MAX_PMA; i++) {
-		if (pma_used[i] == (unsigned long)addr) {
-			pma_used[i] = 0;
-			sbi_free_pma((unsigned long)addr);
-			break;
+	if(!pa_msb){
+		/* Free PMA regitser */
+		for (i = 0; i < MAX_PMA; i++) {
+			if (pma_used[i] == (unsigned long)addr) {
+				pma_used[i] = 0;
+				sbi_free_pma((unsigned long)addr);
+				break;
+			}
 		}
 	}
 #endif
