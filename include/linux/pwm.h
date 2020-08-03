@@ -261,7 +261,7 @@ struct pwm_ops {
 	int (*request)(struct pwm_chip *chip, struct pwm_device *pwm);
 	void (*free)(struct pwm_chip *chip, struct pwm_device *pwm);
 	int (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-		      int duty_ns, int period_ns);
+		      unsigned int duty_ns, unsigned int period_ns);
 	int (*set_polarity)(struct pwm_chip *chip, struct pwm_device *pwm,
 			    enum pwm_polarity polarity);
 	int (*capture)(struct pwm_chip *chip, struct pwm_device *pwm,
