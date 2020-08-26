@@ -411,6 +411,9 @@ static int snd_ftssp_capture_copy(struct snd_pcm_substream *substream,
 
 	u32 *dma_va = NULL;
 	u16 *usr_va = usr_buf;
+	/* convert to frames */
+	pos = bytes_to_frames(substream->runtime, pos);
+	count = bytes_to_frames(substream->runtime, count);
 
 	switch (runtime->rate) {
 	case 8000:
@@ -441,7 +444,7 @@ static int snd_ftssp_capture_copy(struct snd_pcm_substream *substream,
 				 *   defined in "FTSSP010_lib.c".  Mask out
 				 *   one channel to avoid hi-freq noise.
 				 */
-				usr_va += 2;
+				usr_va += 1;
 				dma_va += 12;
 			}
 		}
@@ -475,7 +478,7 @@ static int snd_ftssp_capture_copy(struct snd_pcm_substream *substream,
 				 *   defined in "FTSSP010_lib.c".  Mask out
 				 *   one channel to avoid hi-freq noise.
 				 */
-				usr_va += 2;
+				usr_va++;
 				dma_va += 6;
 			}
 		}
@@ -496,7 +499,8 @@ static int snd_ftssp_capture_copy(struct snd_pcm_substream *substream,
 
 		if (runtime->channels == 1) {
 			while (count--) {
-				 put_user((u16)(dma_va[0] >> 4),usr_va++);	
+				 put_user((u16)(dma_va[0] >> 4),usr_va++);
+				dma_va += 1;
 			}
 		} else {
 			while (count--) {
@@ -509,7 +513,7 @@ static int snd_ftssp_capture_copy(struct snd_pcm_substream *substream,
 				 *   defined in "FTSSP010_lib.c".  Mask out
 				 *   one channel to avoid hi-freq noise.
 				 */
-				usr_va += 2;
+				usr_va += 1;
 				dma_va += 2;
 			}
 		}

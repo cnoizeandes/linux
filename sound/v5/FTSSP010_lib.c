@@ -279,21 +279,21 @@ static void _ftssp010_config_ac97(int cardno, unsigned is_stereo, unsigned speed
 
 	if (is_rec) {	/* Recording */
 		/* Mute output */
-		//ftssp010_ac97_write_codec(W83972D_STEREO_OUTPUT_CONTROL, 0x8000);
+		ftssp010_ac97_write_codec(W83972D_STEREO_OUTPUT_CONTROL, 0x8000);
 		/* Mute PCM */
 		//ftssp010_ac97_write_codec(W83972D_PCM_OUTPUT_CONTROL, 0x8000);
 
 		/* Register 0x10, Line-In/Mic Gain */
-		ftssp010_ac97_write_codec(W83972D_LINE_IN_VOLUME, 0x808);
 		//ftssp010_ac97_write_codec(W83972D_AUX_INPUT_CONTROL, 0x808);
-		ftssp010_ac97_write_codec(W83972D_MIC_VOLUME, 0x8);
 		/* FIXME: REC from line-in only */
 
 		/* Register 0x1A, Record Select=StereoMix */
-		ftssp010_ac97_write_codec(W83972D_RECORD_SELECT, 0x505 /*404*/);
+		ftssp010_ac97_write_codec(W83972D_RECORD_SELECT, 0x0000 /*404*/);
+		ftssp010_ac97_write_codec(W83972D_MIC_VOLUME, 0x0040);
 		/* Register 0x1C, Record Gain=0db */
-		ftssp010_ac97_write_codec(W83972D_RECORD_GAIN, 0x808);
-		ftssp010_ac97_write_codec(W83972D_RECORD_GAIN_MIC, 0x8);
+		ftssp010_ac97_write_codec(W83972D_RECORD_GAIN_MIC, 0x0808);
+		ftssp010_ac97_write_codec(W83972D_PCM_OUTPUT_CONTROL, 0x8000);
+		ftssp010_ac97_write_codec(W83972D_RECORD_GAIN, 0x0808);
 	} else {	/* Playback */
 		/* Register 0x10, Mute Line-In/Mic Gain */
 		ftssp010_ac97_write_codec(W83972D_LINE_IN_VOLUME, 0x8000);
