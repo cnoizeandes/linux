@@ -1073,7 +1073,7 @@ static int ftsdc_state_show(struct seq_file *seq, void *v)
 {
 	struct ftsdc_host *host = seq->private;
 
-	seq_printf(seq, "Register base = 0x%08x\n", (u32)host->base);
+	seq_printf(seq, "Register base = 0x%08x\n", (u32)((unsigned long)host->base));
 	seq_printf(seq, "Clock rate = %u\n", host->real_rate);
 	seq_printf(seq, "host status = %s\n", host->status);
 	seq_printf(seq, "IRQ = %d\n", host->irq);

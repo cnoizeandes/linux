@@ -511,22 +511,6 @@ static int atciic_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int atciic_suspend(struct platform_device *pdev, pm_message_t mesg)
-{
-	return 0;
-}
-
-static int atciic_resume(struct platform_device *pdev)
-{
-	return 0;
-}
-
-#else
-#define atciic_suspend	NULL
-#define atciic_resume	NULL
-#endif
-
 #ifdef CONFIG_OF
 static const struct of_device_id atc_iic_dt_match[] = {
 	{ .compatible = "andestech,atciic100" },

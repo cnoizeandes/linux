@@ -991,6 +991,7 @@ static int ftmac100_poll(struct napi_struct *napi, int budget)
 static int ftmac100_open(struct net_device *netdev)
 {
 	struct ftmac100 *priv = netdev_priv(netdev);
+	struct net *net;
 	int err;
 
 	err = ftmac100_alloc_buffers(priv);
@@ -1008,7 +1009,6 @@ static int ftmac100_open(struct net_device *netdev)
 	// set sysctl ip fragmentation parameters.
 	// sysctl -w net.ipv4.ipfrag_time
 	// sysctl -w net.ipv4.ipfrag_high_thresh
-	struct net *net;
 	net = dev_net(netdev);
 	net->ipv4.fqdir->timeout= (5* HZ);         		/* Decrease fragment timeout, 30 -> 5 */
 	net->ipv4.fqdir->high_thresh= 8 * 1024 * 1024;  /* Increase fragment buffer size, 4M -> 8M */

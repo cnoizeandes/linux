@@ -70,7 +70,7 @@ void cpu_dcache_wb_range(unsigned long start, unsigned long end, int line_size)
 		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_WB);
 
 		if (l2c_base) {
-			pa = virt_to_phys(start);
+			pa = virt_to_phys((volatile void *)start);
 			writel(pa, (void*)(l2c_base + L2C_REG_CN_ACC_OFFSET(mhartid)));
 			writel(CCTL_L2_PA_WB, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
 			while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
@@ -91,7 +91,7 @@ void cpu_dcache_inval_range(unsigned long start, unsigned long end, int line_siz
 		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_INVAL);
 
 		if (l2c_base) {
-			pa = virt_to_phys(start);
+			pa = virt_to_phys((volatile void *)start);
 			writel(pa, (void*)(l2c_base + L2C_REG_CN_ACC_OFFSET(mhartid)));
 			writel(CCTL_L2_PA_INVAL, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
 			while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
