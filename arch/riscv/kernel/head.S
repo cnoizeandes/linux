@@ -194,7 +194,11 @@ clear_bss_done:
 	REG_S a0, (a2)
 
 	/* Initialize page tables and relocate to virtual addresses */
-	la sp, init_thread_union + THREAD_SIZE
+    la t0, init_thread_union + THREAD_SIZE 
+    mv sp, t0
+	call setup_maxpa
+
+	/* Pass DTB addr to setup_vm */
 	mv a0, s1
 	call setup_maxpa
 	call setup_vm
@@ -202,9 +206,11 @@ clear_bss_done:
 	call relocate
 
 	/* Restore C environment */
-	la tp, init_task
+    la t0, init_task
+    mv tp, t0
 	sw zero, TASK_TI_CPU(tp)
-	la sp, init_thread_union + THREAD_SIZE
+    la t0, init_thread_union + THREAD_SIZE
+    mv sp, t0
 
 #ifdef CONFIG_KASAN
 	call kasan_early_init

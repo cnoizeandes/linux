@@ -782,35 +782,6 @@ static int faradayfb_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-/* suspend and resume support for the lcd controller */
-static int faradayfb_suspend(struct platform_device *pdev, pm_message_t mesg)
-{
-	struct fb_info *info = platform_get_drvdata(pdev);
-
-	//    if (level == SUSPEND_DISABLE || level == SUSPEND_POWER_DOWN)
-	if (mesg.event == PM_EVENT_PRETHAW || mesg.event & PM_EVENT_SLEEP)
-		set_ctrlr_state(info, C_DISABLE_PM);
-
-	return 0;
-}
-
-static int faradayfb_resume(struct platform_device *pdev)
-{
-	struct fb_info *info = platform_get_drvdata(pdev);
-
-	//    need modify
-	//    if (level == RESUME_ENABLE)
-	set_ctrlr_state(info, C_ENABLE_PM);
-
-	return 0;
-}
-
-#else
-#define faradayfb_suspend NULL
-#define faradayfb_resume  NULL
-#endif
-
 static struct of_device_id atflcd_of_match[] = {
 	{ .compatible = "andestech,atflcdc100", },
 	{},
