@@ -46,11 +46,6 @@ static inline void flush_dcache_mmap_unlock(struct address_space *mapping)
 {
 }
 
-static inline void flush_icache_page(struct vm_area_struct *vma,
-				     struct page *page)
-{
-}
-
 static inline void flush_cache_vmap(unsigned long start, unsigned long end)
 {
 	local_flush_tlb_all();
@@ -100,6 +95,12 @@ void flush_icache_mm(struct mm_struct *mm, bool local);
  */
 #define flush_icache_range(start, end) flush_icache_all()
 #define flush_icache_user_range(vma, pg, addr, len) flush_icache_all()
+
+static inline void flush_icache_page(struct vm_area_struct *vma,
+				     struct page *page)
+{
+  flush_icache_all();
+}
 
 /*
  * Bits in sys_riscv_flush_icache()'s flags argument.
