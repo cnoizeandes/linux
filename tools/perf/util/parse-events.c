@@ -37,6 +37,9 @@
 #include "util/evsel_config.h"
 #include "util/event.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
+
 #define MAX_NAME_LEN 100
 
 #ifdef PARSER_DEBUG
@@ -2867,3 +2870,4 @@ char *parse_events_formats_error_string(char *additional_terms)
 fail:
 	return NULL;
 }
+#pragma GCC diagnostic pop

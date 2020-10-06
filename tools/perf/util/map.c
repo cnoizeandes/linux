@@ -121,9 +121,13 @@ static inline bool replace_android_lib(const char *filename, char *newfilename)
 
 		if (new_length > PATH_MAX)
 			return false;
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wformat-truncation"
 		snprintf(newfilename, new_length,
 			"%s/platforms/%s/arch-%s/usr/lib/%s",
 			ndk, app, arch, libname);
+        #pragma GCC diagnostic pop
+        //XXX: -Wno-format-truncation
 
 		return true;
 	}
