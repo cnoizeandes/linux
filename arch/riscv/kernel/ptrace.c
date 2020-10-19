@@ -176,10 +176,12 @@ void user_disable_single_step(struct task_struct *child)
 #define ICOUNT 1
 void do_singlestep(void)
 {
-	if (test_thread_flag(TIF_SINGLESTEP))
+	if (test_thread_flag(TIF_SINGLESTEP)) {
 		sbi_set_trigger(TRIGGER_TYPE_ICOUNT, ICOUNT, 1);
-	else
-		sbi_set_trigger(TRIGGER_TYPE_ICOUNT, ICOUNT, 0);
+		csr_write(scontext, 1);
+	} else {
+		csr_write(scontext, 0);
+	}
 }
 /*
  * Allows PTRACE_SYSCALL to work.  These are called from entry.S in
