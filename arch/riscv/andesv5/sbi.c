@@ -59,3 +59,9 @@ long sbi_probe_pma(void)
 	return ret.value;
 }
 EXPORT_SYMBOL(sbi_probe_pma);
+
+void sbi_set_trigger(unsigned int type, uintptr_t data, int enable)
+{
+	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_TRIGGER, type, data, enable, 0, 0, 0);
+}
+EXPORT_SYMBOL(sbi_set_trigger);

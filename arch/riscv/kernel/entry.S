@@ -220,7 +220,7 @@ handle_syscall:
 	REG_S s2, PT_SEPC(sp)
 	/* Trace syscalls, but only if requested by the user. */
 	REG_L t0, TASK_TI_FLAGS(tp)
-	andi t0, t0, _TIF_SYSCALL_WORK
+	andi t0, t0, _TIF_WORK_SYSCALL_MASK
 	bnez t0, handle_syscall_trace_enter
 check_syscall_nr:
 	/* Check to make sure we don't jump to a bogus syscall number. */
@@ -240,7 +240,7 @@ ret_from_syscall:
 	REG_S a0, PT_A0(sp)
 	/* Trace syscalls, but only if requested by the user. */
 	REG_L t0, TASK_TI_FLAGS(tp)
-	andi t0, t0, _TIF_SYSCALL_WORK
+	andi t0, t0, _TIF_WORK_SYSCALL_MASK
 	bnez t0, handle_syscall_trace_exit
 
 ret_from_exception:
@@ -254,6 +254,9 @@ resume_userspace:
 	REG_L s0, TASK_TI_FLAGS(tp) /* current_thread_info->flags */
 	andi s1, s0, _TIF_WORK_MASK
 	bnez s1, work_pending
+
+	/* Set trigger module for single step */
+	call do_singlestep
 
 	/* Save unwound kernel stack pointer in thread_info */
 	addi s0, sp, PT_SIZE_ON_STACK
