@@ -42,14 +42,19 @@
 #define ELF_ET_DYN_BASE		((TASK_SIZE / 3) * 2)
 
 /*
- * Andes Support: ELF attribute checking
+ * This yields a mask that user programs can use to figure out what
+ * instruction set this CPU supports.  This could be done in user space,
+ * but it's not easy, and we've already done it here.
  */
 #define ELF_HWCAP	(elf_hwcap)
-#define ELF_HWCAP2	(elf_hwcap2)
-extern unsigned int elf_hwcap;
-extern unsigned int elf_hwcap2;
-#define ELF_PLATFORM	(elf_platform)
-extern const char *elf_platform;
+extern unsigned long elf_hwcap;
+
+/*
+ * This yields a string that ld.so will use to load implementation
+ * specific libraries for optimization.  This is more specific in
+ * intent than poking at uname or /proc/cpuinfo.
+ */
+#define ELF_PLATFORM	(NULL)
 
 #define ARCH_DLINFO						\
 do {								\
@@ -63,19 +68,4 @@ struct linux_binprm;
 extern int arch_setup_additional_pages(struct linux_binprm *bprm,
 	int uses_interp);
 
-struct file;
-#ifdef CONFIG_64BIT
-struct elf64_phdr;
-extern int arch_elf_pt_proc(void *ehdr, struct elf64_phdr *phdr, struct file *elf,
-	bool is_interp, void *state);
-#else
-struct elf32_phdr;
-extern int arch_elf_pt_proc(void *ehdr, struct elf32_phdr *phdr, struct file *elf,
-	bool is_interp, void *state);
-#endif
-
-struct arch_elf_state {
-};
-#define INIT_ARCH_ELF_STATE { }
-#define arch_check_elf(ehdr, interp, interp_ehdr, state) (0)
 #endif /* _ASM_RISCV_ELF_H */
