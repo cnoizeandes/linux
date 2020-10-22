@@ -48,6 +48,7 @@ struct pt_regs {
 	unsigned long sstatus;
 	unsigned long sbadaddr;
 	unsigned long scause;
+	unsigned long sdcause;
 	/* a0 value before the syscall */
 	unsigned long orig_a0;
 };
