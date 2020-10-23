@@ -84,7 +84,7 @@ _save_context:
 	csrr s3, CSR_STVAL
 	csrr s4, CSR_SCAUSE
 	csrr s5, CSR_SSCRATCH
-	csrr s5, CSR_SDCAUSE
+	csrr s6, CSR_SDCAUSE
 	REG_S s0, PT_SP(sp)
 	REG_S s1, PT_SSTATUS(sp)
 	REG_S s2, PT_SEPC(sp)
