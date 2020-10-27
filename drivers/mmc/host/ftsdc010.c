@@ -414,10 +414,15 @@ static void ftsdc_work(struct work_struct *work)
 {
 	struct ftsdc_host *host =
 		container_of(work, struct ftsdc_host, work);
+	struct mmc_data *data = host->mrq->data;
+
+	int rw = (data->flags & MMC_DATA_WRITE) ? 1 : 0;
 
 	ftsdc_enable_irq(host, false);
 	if (host->dodma) {
 		do_dma_access(host);
+		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+				     rw ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
 	} else {
 		if (host->buf_active == XFER_WRITE)
 			do_pio_write(host);
