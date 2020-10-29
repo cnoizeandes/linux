@@ -19,6 +19,7 @@ void *kmap(struct page *page)
 	if (!PageHighMem(page))
 		return page_address(page);
 	vaddr = (unsigned long)kmap_high(page);
+	flush_cache_kmaps();
 	return (void *)vaddr;
 }
 
@@ -54,6 +55,7 @@ void *kmap_atomic(struct page *page)
 
 	ptep = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
 	set_pte(ptep, mk_pte(page, kmap_prot));
+	flush_cache_kmaps();
 
 	return (void *)vaddr;
 }
@@ -68,6 +70,7 @@ void __kunmap_atomic(void *kvaddr)
 		kmap_atomic_idx_pop();
 		ptep = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
 		set_pte(ptep, __pte(0));
+		flush_cache_kmaps();
 	}
 	pagefault_enable();
 	preempt_enable();
