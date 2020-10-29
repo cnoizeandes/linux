@@ -25,7 +25,8 @@
 
 static inline void flush_cache_kmaps(void)
 {
-	flush_cache_all();
+   /* Do fence.i I-cache inval and D-cache wb_all */
+    local_flush_tlb_all();
 }
 
 /* Declarations for highmem.c */

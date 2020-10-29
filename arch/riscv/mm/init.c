@@ -558,7 +558,7 @@ static void __init pkmap_init(void)
                         pgprot_val(__pgprot(_PAGE_TABLE))));
     /* Adjust pkmap page table base */
     pkmap_page_table = pkmap_p + pte_index(vaddr);
-
+	flush_cache_kmaps();
 }
 #else
 static void __init pkmap_init(void){ }
