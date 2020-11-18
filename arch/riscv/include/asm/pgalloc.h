@@ -26,6 +26,7 @@ static inline void pmd_populate(struct mm_struct *mm,
 	unsigned long pfn = virt_to_pfn(page_address(pte));
 
 	set_pmd(pmd, __pmd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+
 	local_flush_tlb_all();
 }
 
@@ -35,6 +36,8 @@ static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
 	unsigned long pfn = virt_to_pfn(pmd);
 
 	set_pud(pud, __pud((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+
+	local_flush_tlb_all();
 }
 #endif /* __PAGETABLE_PMD_FOLDED */
 
