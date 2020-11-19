@@ -361,6 +361,17 @@
 		interrupt-parent = <0x6>;
 	};
 
+	ts0: ts@f0f00000 {
+		compatible = "andestech,atcts";
+		clock-frequency = <60000000>;
+		spi-max-frequency = <1000000>;
+		reg = <0x0 0xf0f00000 0x0 0x1000>;
+		interrupts = <22 4>;
+		interrupt-parent = <0x6>;
+		x-size = <320>;
+		y-size = <240>;
+	};
+
 	aliases {
 		uart0 = "/serial@f0300000";
 		spi0 = "/spi@f0b00000";
