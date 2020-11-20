@@ -471,7 +471,7 @@ config ATCWDT200_WATCHDOG
 	tristate "ATCWDT200_WATCHDOG"
 	depends on RISCV && PLAT_AE350
 	help
-	  Support for Andes aycwdt200 watchdog. When the watchdog triigers the
+	  Support for Andes atcwdt200 watchdog. When the watchdog triggers the
 	  system will be reset.
 
 config IXP4XX_WATCHDOG

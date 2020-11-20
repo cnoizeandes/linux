@@ -216,6 +216,7 @@ static long wdtdog_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 }
 
+#ifdef CONFIG_ATCSMU
 extern struct atc_smu atcsmu;
 static int atcwdt200_restart_call(struct notifier_block *nb,
 								unsigned long action, void *data)
@@ -239,6 +240,8 @@ static struct notifier_block atcwdt200_restart = {
     .notifier_call = atcwdt200_restart_call,
     .priority = 255,
 };
+#endif
+
 
 static struct file_operations wdtdog_fops = {
 	.owner		= THIS_MODULE,
@@ -284,7 +287,9 @@ static int atcwdt200_dog_probe(struct platform_device *pdev){
 	if( ret)
 		return ret;
 
+#ifdef CONFIG_ATCSMU 
 	register_restart_handler(&atcwdt200_restart);
+#endif
 
 	DEBUG("ATCWDT200 watchdog timer: timer timeout %d sec\n", timeout);
 	return 0;

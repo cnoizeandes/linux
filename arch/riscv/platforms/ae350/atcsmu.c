@@ -18,6 +18,7 @@
 extern int suspend_begin;
 
 struct atc_smu atcsmu;
+EXPORT_SYMBOL(atcsmu);
 int get_pd_type(unsigned int cpu)
 {
 	struct atc_smu *smu = &atcsmu;
@@ -162,9 +163,8 @@ void andes_suspend2standby(void)
 
 #ifdef CONFIG_ATCSMU
 // other harts
-void atcsmu100_set_suspend_mode(void){
-	int cpu = smp_processor_id();
-
+void atcsmu100_set_suspend_mode(void)
+{
 	if (suspend_begin == PM_SUSPEND_MEM) {
 		sbi_set_suspend_mode(DeepSleepMode);
 	}else if(suspend_begin == PM_SUSPEND_STANDBY){
@@ -191,8 +191,6 @@ static int atcsmu100_restart_call(struct notifier_block *nb,
                        pr_err("Disable D-cache FAIL\n"
                                "ERROR CODE:%d\n", ret);
        }
-#else
-       int id = 0;
 #endif
        cpu_dcache_disable(NULL);
        cpu_l2c_disable();
