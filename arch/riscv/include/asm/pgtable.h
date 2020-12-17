@@ -152,6 +152,7 @@ static inline int pmd_bad(pmd_t pmd)
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
 	*pmdp = pmd;
+	local_flush_tlb_all();
 }
 
 static inline void pmd_clear(pmd_t *pmdp)
@@ -335,7 +336,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
 	 * Relying on flush_tlb_fix_spurious_fault would suffice, but
 	 * the extra traps reduce performance.  So, eagerly SFENCE.VMA.
 	 */
-	local_flush_tlb_all();
+	local_flush_tlb_page(address);
 }
 
 #define __HAVE_ARCH_PTE_SAME
@@ -352,6 +353,7 @@ static inline int pte_same(pte_t pte_a, pte_t pte_b)
 static inline void set_pte(pte_t *ptep, pte_t pteval)
 {
 	*ptep = pteval;
+	local_flush_tlb_all();
 }
 
 void flush_icache_pte(pte_t pte);
