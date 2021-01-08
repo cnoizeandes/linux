@@ -411,11 +411,13 @@ void __init ae300_add_device_i2c(struct i2c_board_info *devices, int nr_devices)
 /*
  * Main initialization routine.
  */
+extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val);
+
 static int atciic_probe(struct platform_device *pdev)
 {
 	struct i2c_adapter *padap;
 	struct atciic *iface;
-	int rc;
+	int rc, ret;
 #if SUPPORT_AT24C128_BY_BOARD
 	ae300_add_device_i2c(ae300_i2c_devices,ARRAY_SIZE(ae300_i2c_devices));
 #endif
@@ -446,12 +448,14 @@ static int atciic_probe(struct platform_device *pdev)
 		rc = -ENXIO;
 		goto out_error_get_io;
 	}
-	if(((IIC(IDREV)>>ID_OFF)&ID_MSK)!=ID)
-	{
-		dev_err(&pdev->dev, "I2C version NOT match\n");
+	/* Check ID and Revision Register */
+	ret = readl_fixup(iface->regs_base, 0x02021012);
+	if(!ret){
+		dev_err(&pdev->dev, "I2C version NOT match, bitmap not support atciic100\n");
 		rc = -ENXIO;
 		goto out_error_get_io;
 	}
+
 	iface->irq = platform_get_irq(pdev, 0);
 	if (iface->irq < 0) {
 		dev_err(&pdev->dev, "No IRQ specified\n");

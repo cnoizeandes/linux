@@ -266,6 +266,7 @@ static const struct of_device_id atcwdt200_dog_match[] = {
 MODULE_DEVICE_TABLE(of, atcwdt200_dog_match);
 #endif
 
+extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val);
 static int atcwdt200_dog_probe(struct platform_device *pdev){
 	int ret;
 	struct resource *res;
@@ -275,6 +276,13 @@ static int atcwdt200_dog_probe(struct platform_device *pdev){
 	wdt_base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(wdt_base))
 		return PTR_ERR(wdt_base);
+
+	/* check ID and Revision register */
+	ret = readl_fixup(wdt_base, 0x03002004);
+	if (!ret){
+		dev_err(&pdev->dev, "fail to read ID and Revision reg, bitmap not support atcwdt200.\n");
+		return -ENOENT;
+	}
 
 	if((idrev & ID_MSK)!=ID)
 		return -ENOENT;
@@ -290,6 +298,8 @@ static int atcwdt200_dog_probe(struct platform_device *pdev){
 #ifdef CONFIG_ATCSMU 
 	register_restart_handler(&atcwdt200_restart);
 #endif
+
+	dev_info(&pdev->dev, "ATCWDT200 watchdog timer driver.\n");
 
 	DEBUG("ATCWDT200 watchdog timer: timer timeout %d sec\n", timeout);
 	return 0;
