@@ -1421,10 +1421,13 @@ static int ftssp_alsa_i2c_i2s_exit(void)
 	return 0;
 }
 
+extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val);
+
 static int atf_ac97_probe(struct platform_device *pdev)
 {
 	struct resource *r, *mem = NULL;
 	size_t mem_size;
+	int ret;
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	ssp2_pbase = r->start;
@@ -1432,6 +1435,12 @@ static int atf_ac97_probe(struct platform_device *pdev)
 	mem = request_mem_region(r->start, mem_size, pdev->name);
 	ssp2_vbase = (resource_size_t) ioremap(mem->start, mem_size);
 
+	/* Check SSP feature register */
+	ret = readl_fixup((const volatile void __iomem *)ssp2_vbase+0x44, 0x1f0f0f1f);
+	if (!ret){
+		ERR("%s: ftssp feature register not detect, bitmap no support ftssp \n", __func__);
+		return -ENXIO;
+	}
 	return ftssp_alsa_init(pdev);
 }
 

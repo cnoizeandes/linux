@@ -1101,13 +1101,15 @@ static const struct net_device_ops ftmac100_netdev_ops = {
 /******************************************************************************
  * struct platform_driver functions
  *****************************************************************************/
+extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val);
+
 static int ftmac100_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	int irq;
 	struct net_device *netdev;
 	struct ftmac100 *priv;
-	int err;
+	int err, ret;
 
 	if (!pdev)
 		return -ENODEV;
@@ -1155,6 +1157,14 @@ static int ftmac100_probe(struct platform_device *pdev)
 	priv->base = ioremap(res->start, resource_size(res));
 	if (!priv->base) {
 		dev_err(&pdev->dev, "Failed to ioremap ethernet registers\n");
+		err = -EIO;
+		goto err_ioremap;
+	}
+
+	/*Check feature register*/
+	ret = readl_fixup(priv->base+0x38, 0x7);
+	if (!ret){
+		dev_err(&pdev->dev, "feature registers not detect, bitmap not support ftmac100\n");
 		err = -EIO;
 		goto err_ioremap;
 	}

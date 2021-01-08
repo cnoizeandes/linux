@@ -316,6 +316,7 @@ static int atcspi200_spi_transfer_one_message(struct spi_master *master,struct s
 
 	return 0;
 }
+extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val);
 static int atcspi200_spi_probe(struct platform_device *pdev)
 {
 	struct resource *res;
@@ -336,9 +337,17 @@ static int atcspi200_spi_probe(struct platform_device *pdev)
 	/* get base addr  */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	spi->regs = devm_ioremap_resource(&pdev->dev, res);
+
 	if (IS_ERR(spi->regs)) {
 		dev_err(&pdev->dev, "Unable to map IO resources\n");
 		ret = PTR_ERR(spi->regs);
+		goto put_master;
+	}
+
+	/* check ID and Revision register */
+	ret = readl_fixup(spi->regs, 0x0200204a);
+	if (!ret){
+		dev_err(&pdev->dev, "Fail to read ID and Revision register, bitmap not support spi200\n");
 		goto put_master;
 	}
 

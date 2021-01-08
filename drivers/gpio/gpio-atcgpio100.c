@@ -196,6 +196,8 @@ static void gpio_irq_router(struct irq_desc *desc)
 	desc->irq_data.chip->irq_eoi(&desc->irq_data);
 }
 
+extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val);
+
 static int atcgpio100_gpio_probe(struct platform_device *pdev)
 {
 	struct resource *res, *irq_res;
@@ -228,6 +230,13 @@ static int atcgpio100_gpio_probe(struct platform_device *pdev)
 
 	if (IS_ERR((void *)priv->base))
 		return PTR_ERR((void *)priv->base);
+
+	/* Check ID register */
+	ret = readl_fixup(priv->base, 0x02031002);
+	if (!ret){
+		dev_err(&pdev->dev, "failed read ID register,bitmap not support gpio100\n");
+		return -ENXIO;
+	}
 
 	/* disable interrupt */
 	GPIO_WRITEL(0x00000000UL, INT_ENABLE, priv->base);
