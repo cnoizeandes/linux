@@ -218,6 +218,7 @@ struct entry_struct proc_table_cache[] = {
 
 	{"ic_en", 0644, &en_fops},
 	{"dc_en", 0644, &en_fops},
+	{NULL, 0, NULL},
 };
 static int __init init_cctl(void)
 {
