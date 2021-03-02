@@ -203,8 +203,10 @@ __visible void do_syscall_trace_enter(struct pt_regs *regs)
 
 __visible void do_syscall_trace_exit(struct pt_regs *regs)
 {
+	int step;
+
 	audit_syscall_exit(regs);
-	int step = test_thread_flag(TIF_SINGLESTEP);
+	step = test_thread_flag(TIF_SINGLESTEP);
 
 	if (test_thread_flag(TIF_SYSCALL_TRACE))
 		tracehook_report_syscall_exit(regs, step);
