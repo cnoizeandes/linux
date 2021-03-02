@@ -1433,10 +1433,10 @@ static int atf_ac97_probe(struct platform_device *pdev)
 	ssp2_pbase = r->start;
 	mem_size = resource_size(r);
 	mem = request_mem_region(r->start, mem_size, pdev->name);
-	ssp2_vbase = (resource_size_t) ioremap(mem->start, mem_size);
+	ssp2_vbase = (resource_size_t)(unsigned long)ioremap(mem->start, mem_size);
 
 	/* Check SSP feature register */
-	ret = readl_fixup((void __iomem *)ssp2_vbase+0x44, 0x1f0f0f1f);
+	ret = readl_fixup((void __iomem *)(unsigned long)ssp2_vbase+0x44, 0x1f0f0f1f);
 	if (!ret){
 		ERR("%s: ftssp feature register not detect, bitmap no support ftssp \n", __func__);
 		return -ENXIO;

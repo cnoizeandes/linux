@@ -711,7 +711,7 @@ static int faradayfb_probe(struct platform_device *pdev)
 		goto err_exit;
 	}
 
-	lcd_base = (resource_size_t)devm_ioremap_resource(&pdev->dev, io);
+	lcd_base = (resource_size_t)(unsigned long)devm_ioremap_resource(&pdev->dev, io);
 	pdev->dev.platform_data	= &ffb_mach_info,
 
 	info = faradayfb_init_fbinfo(&pdev->dev);
