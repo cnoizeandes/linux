@@ -75,7 +75,6 @@ config ARCH_MMAP_RND_BITS_MIN
 config ARCH_MMAP_RND_BITS_MAX
 	default 24 if 64BIT # SV39 based
 	default 17
-	select MODULE_SECTIONS if MODULES
 config CPU_FREQ
 	def_bool y
 
