@@ -211,7 +211,7 @@ static inline void get_data_buffer(struct ftsdc_host *host)
 	sg = &host->mrq->data->sg[host->buf_sgptr];
 
 	host->buf_bytes = sg->length;
-	host->buf_ptr = host->dodma ? (u32 *)sg->dma_address : sg_virt(sg);
+	host->buf_ptr = host->dodma ? (u32 *)(unsigned long)sg->dma_address : sg_virt(sg);
 	host->buf_sgptr++;
 }
 
@@ -386,7 +386,7 @@ static void do_dma_access(struct ftsdc_host *host)
 			goto err;
 		}
 		drb->addr0 = host->mem->start + SDC_DATA_WINDOW_REG;
-		drb->addr1 = (dma_addr_t)host->buf_ptr;
+		drb->addr1 = (dma_addr_t)(unsigned long)host->buf_ptr;
 		drb->req_cycle = dmad_bytes_to_cycles(req, host->buf_bytes);
 		drb->sync = &host->dma_complete;
 		timeout = SDC_TIMEOUT_BASE*((host->buf_bytes+511)>>9);
