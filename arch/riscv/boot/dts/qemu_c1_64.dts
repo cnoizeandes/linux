@@ -16,10 +16,10 @@
 			reg = <0x0>;
 			status = "okay";
 			compatible = "riscv";
-			riscv,isa = "rv32i2p0m2p0a2p0f2p0d2p0c2p0xv5-0p0";
+			riscv,isa = "rv64i2p0m2p0a2p0f2p0d2p0c2p0xv5-0p0";
 			riscv,priv-major = <0x1>;
 			riscv,priv-minor = <0xa>;
-			mmu-type = "riscv,sv32";
+			mmu-type = "riscv,sv39";
 			clock-frequency = <0x3938700>;
 			d-cache-size = <0x8000>;
 			d-cache-line-size = <0x20>;
@@ -29,27 +29,6 @@
 				interrupt-controller;
 				compatible = "riscv,cpu-intc";
 				phandle = <0x1>;
-			};
-		};
-
-		cpu@1 {
-			device_type = "cpu";
-			reg = <0x1>;
-			status = "okay";
-			compatible = "riscv";
-			riscv,isa = "rv32i2p0m2p0a2p0f2p0d2p0c2p0xv5-0p0";
-			riscv,priv-major = <0x1>;
-			riscv,priv-minor = <0xa>;
-			mmu-type = "riscv,sv32";
-			clock-frequency = <0x3938700>;
-			d-cache-size = <0x8000>;
-			d-cache-line-size = <0x20>;
-
-			interrupt-controller {
-				#interrupt-cells = <0x1>;
-				interrupt-controller;
-				compatible = "riscv,cpu-intc";
-				phandle = <0x2>;
 			};
 		};
 	};
@@ -72,8 +51,8 @@
 			interrupt-controller;
 			reg = <0x0 0xe4000000 0x0 0x2000000>;
 			riscv,ndev = <0x47>;
-			interrupts-extended = <0x1 0xb 0x1 0x9 0x2 0xb 0x2 0x9>;
-			phandle = <0x3>;
+			interrupts-extended = <0x1 0xb 0x1 0x9>;
+			phandle = <0x2>;
 		};
 
 		interrupt-controller@e6400000 {
@@ -82,14 +61,14 @@
 			#interrupt-cells = <0x2>;
 			interrupt-controller;
 			reg = <0x0 0xe6400000 0x0 0x400000>;
-			riscv,ndev = <0x2>;
-			interrupts-extended = <0x1 0x3 0x2 0x3>;
+			riscv,ndev = <0x1>;
+			interrupts-extended = <0x1 0x3>;
 		};
 
 		plmt0@e6000000 {
 			compatible = "riscv,plmt0";
 			reg = <0x0 0xe6000000 0x0 0x100000>;
-			interrupts-extended = <0x1 0x7 0x2 0x7>;
+			interrupts-extended = <0x1 0x7>;
 		};
 	};
 
@@ -107,7 +86,7 @@
 		reg-shift = <0x2>;
 		reg-offset = <0x20>;
 		no-loopback-test = <0x1>;
-		interrupt-parent = <0x3>;
+		interrupt-parent = <0x2>;
 	};
 
 	mac@e0100000 {
@@ -119,56 +98,56 @@
 
 	virtio_mmio@fe007000 {
 		interrupts = <0x17 0x4>;
-		interrupt-parent = <0x3>;
+		interrupt-parent = <0x2>;
 		reg = <0x0 0xfe007000 0x0 0x1000>;
 		compatible = "virtio,mmio";
 	};
 
 	virtio_mmio@fe006000 {
 		interrupts = <0x16 0x4>;
-		interrupt-parent = <0x3>;
+		interrupt-parent = <0x2>;
 		reg = <0x0 0xfe006000 0x0 0x1000>;
 		compatible = "virtio,mmio";
 	};
 
 	virtio_mmio@fe005000 {
 		interrupts = <0x15 0x4>;
-		interrupt-parent = <0x3>;
+		interrupt-parent = <0x2>;
 		reg = <0x0 0xfe005000 0x0 0x1000>;
 		compatible = "virtio,mmio";
 	};
 
 	virtio_mmio@fe004000 {
 		interrupts = <0x14 0x4>;
-		interrupt-parent = <0x3>;
+		interrupt-parent = <0x2>;
 		reg = <0x0 0xfe004000 0x0 0x1000>;
 		compatible = "virtio,mmio";
 	};
 
 	virtio_mmio@fe003000 {
 		interrupts = <0x13 0x4>;
-		interrupt-parent = <0x3>;
+		interrupt-parent = <0x2>;
 		reg = <0x0 0xfe003000 0x0 0x1000>;
 		compatible = "virtio,mmio";
 	};
 
 	virtio_mmio@fe002000 {
 		interrupts = <0x12 0x4>;
-		interrupt-parent = <0x3>;
+		interrupt-parent = <0x2>;
 		reg = <0x0 0xfe002000 0x0 0x1000>;
 		compatible = "virtio,mmio";
 	};
 
 	virtio_mmio@fe001000 {
 		interrupts = <0x11 0x4>;
-		interrupt-parent = <0x3>;
+		interrupt-parent = <0x2>;
 		reg = <0x0 0xfe001000 0x0 0x1000>;
 		compatible = "virtio,mmio";
 	};
 
 	virtio_mmio@fe000000 {
 		interrupts = <0x10 0x4>;
-		interrupt-parent = <0x3>;
+		interrupt-parent = <0x2>;
 		reg = <0x0 0xfe000000 0x0 0x1000>;
 		compatible = "virtio,mmio";
 	};
