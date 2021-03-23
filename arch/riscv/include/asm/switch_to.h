@@ -54,11 +54,11 @@ extern bool has_fpu;
 #ifdef CONFIG_DSP
 static inline void dspstate_save(struct task_struct *task)
 {
-	task->thread.dspstate.ucode = csr_read(ucode);
+	task->thread.dspstate.ucode = csr_read(CSR_UCODE);
 }
 static inline void dspstate_restore(struct task_struct *task)
 {
-	csr_write(ucode, task->thread.dspstate.ucode);
+	csr_write(CSR_UCODE, task->thread.dspstate.ucode);
 }
 extern bool has_dsp;
 #else

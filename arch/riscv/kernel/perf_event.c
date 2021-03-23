@@ -409,28 +409,28 @@ void riscv_pmu_disable_counter(int idx)
 {
         u32 val = 1UL << idx;
 
-        csr_set(scountinhibit, val);
+        csr_set(CSR_SCOUNTINHIBIT, val);
 }
 
 void riscv_pmu_enable_counter(int idx)
 {
         u32 val = 1UL << idx;
 
-        csr_clear(scountinhibit, val);
+        csr_clear(CSR_SCOUNTINHIBIT, val);
 }
 
 void riscv_pmu_disable_interrupt(int idx)
 {
         u32 val = 1UL << idx;
 
-        csr_clear(scounterinten, val);
+        csr_clear(CSR_SCOUNTERINTEN, val);
 }
 
 void riscv_pmu_enable_interrupt(int idx)
 {
         u32 val = 1UL << idx;
 
-        csr_set(scounterinten, val);
+        csr_set(CSR_SCOUNTERINTEN, val);
 }
 
 static inline void riscv_pmu_disable_event(struct perf_event *event)
@@ -451,13 +451,13 @@ static inline void riscv_pmu_disable_event(struct perf_event *event)
 static inline void riscv_pmu_disable(void)
 {
         // Disable all counter
-        csr_set(scountinhibit, 0xfffffffd);
+        csr_set(CSR_SCOUNTINHIBIT, 0xfffffffd);
 }
 
 static inline void riscv_pmu_enable(struct perf_event *event)
 {
         // Enable all counter
-	csr_clear(scountinhibit, 0xfffffffd);
+	csr_clear(CSR_SCOUNTINHIBIT, 0xfffffffd);
 }
 
 static int riscv_event_set_period(struct perf_event *event)
@@ -508,27 +508,27 @@ static inline void riscv_pmu_event_enable(struct perf_event *event)
                 return;
 
         if(hwc->config & MMODE_MASK)
-                csr_set(scountermask_m, value);
+                csr_set(CSR_SCOUNTERMASK_M, value);
         if(hwc->config & SMODE_MASK)
-                csr_set(scountermask_s, value);
+                csr_set(CSR_SCOUNTERMASK_S, value);
         if(hwc->config & UMODE_MASK)
-                csr_set(scountermask_u, value);
+                csr_set(CSR_SCOUNTERMASK_U, value);
 
         if (idx < BASE_COUNTERS)
                 return;
 
         switch (idx) {
                 case RISCV_PMU_MHPMCOUNTER3:
-                        csr_write(0x9E3, ev_config);
+                        csr_write(CSR_SHPMEVENT3, ev_config);
                         break;
                 case RISCV_PMU_MHPMCOUNTER4:
-                        csr_write(0x9E4, ev_config);
+                        csr_write(CSR_SHPMEVENT4, ev_config);
                         break;
                 case RISCV_PMU_MHPMCOUNTER5:
-                        csr_write(0x9E5, ev_config);
+                        csr_write(CSR_SHPMEVENT5, ev_config);
                         break;
                 case RISCV_PMU_MHPMCOUNTER6:
-                        csr_write(0x9E6, ev_config);
+                        csr_write(CSR_SHPMEVENT6, ev_config);
                         break;
                 default:
                         pr_err("The number of counters are exceedied!\n");
@@ -594,9 +594,9 @@ static void riscv_pmu_stop(struct perf_event *event, int flags)
 
 	// disable all mask
 	if (cpuc->n_events == 0) {
-		csr_write(scountermask_m, 0);
-		csr_write(scountermask_s, 0);
-		csr_write(scountermask_u, 0);
+		csr_write(CSR_SCOUNTERMASK_M, 0);
+		csr_write(CSR_SCOUNTERMASK_S, 0);
+		csr_write(CSR_SCOUNTERMASK_U, 0);
 	}
 	return;
 l2c_event_stop:
@@ -769,12 +769,12 @@ static DEFINE_MUTEX(pmc_reserve_mutex);
 
 unsigned long riscv_pmu_get_overflow(void)
 {
-        return csr_read(scounterovf);
+        return csr_read(CSR_SCOUNTEROVF);
 }
 
 void riscv_reset_overflow(unsigned long status)
 {
-        csr_write(scounterovf ,status);
+        csr_write(CSR_SCOUNTEROVF ,status);
 }
 
 static atomic_t riscv_active_events = ATOMIC_INIT(0);
@@ -1004,7 +1004,7 @@ static const struct of_device_id riscv_pmu_of_ids[] = {
 void init_cpu_pmu(void *arg)
 {
 	// enable S-mode local interrupt and M-mode interrupt
-	csr_write(slie, PFMOVF_MASK);
+	csr_write(CSR_SLIE, PFMOVF_MASK);
 	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_PFM, 0, 0, 0, 0, 0, 0);
 }
 
