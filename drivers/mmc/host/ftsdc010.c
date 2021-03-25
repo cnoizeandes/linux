@@ -1398,10 +1398,10 @@ static int __init ftsdc_probe(struct platform_device *pdev)
 		goto probe_free_mem_region;
 	}
 
-	/* check interrupt register */
-	ret = readl_fixup(host->base+SDC_INT_MASK_REG+0x8, 0x1ff);
+	/* Check revision register */
+	ret = readl_fixup(host->base + SDC_REVISION_REG, 0x00030107);
 	if (!ret){
-		dev_err(&pdev->dev, "failed to read interrupt reg, bitmap not support ftdsdc\n");
+		dev_err(&pdev->dev, "failed to read revision reg, bitmap not support ftdsdc\n");
 		goto probe_free_mem_region;
 	}
 
