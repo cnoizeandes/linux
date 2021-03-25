@@ -10,6 +10,7 @@
 #include <linux/module.h>
 #include <linux/blkdev.h>
 #include <linux/proc_fs.h>
+#include <linux/uaccess.h>
 #include <asm/andesv5/csr.h>
 #include <asm/andesv5/proc.h>
 
