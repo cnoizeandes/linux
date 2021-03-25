@@ -1161,10 +1161,10 @@ static int ftmac100_probe(struct platform_device *pdev)
 		goto err_ioremap;
 	}
 
-	/*Check feature register*/
-	ret = readl_fixup(priv->base+0x38, 0x7);
+	/*Check revision register*/
+	ret = readl_fixup(priv->base + FTMAC100_OFFSET_REVISION, 0x00010407);
 	if (!ret){
-		dev_err(&pdev->dev, "feature registers not detect, bitmap not support ftmac100\n");
+		dev_err(&pdev->dev, "fail to read revision reg, bitmap not support ftmac100\n");
 		err = -EIO;
 		goto err_ioremap;
 	}
