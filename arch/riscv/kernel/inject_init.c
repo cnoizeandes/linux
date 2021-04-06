@@ -17,7 +17,7 @@ static int inject_show(struct seq_file *m, void *v)
         unsigned char *p = (unsigned char *)inject;
 
         if (inject != NULL && p[0] == 0) {
-                seq_printf(m, "#!/bin/sh\necho Normal boot test 3\n");
+                //do nothing
         } else if (inject != NULL) {
                 for (i = 0; i < INJECT_SIZE/PAGE_SIZE; i+=PAGE_SIZE) {
                         seq_write(m, (void*)&p[i], PAGE_SIZE);
