@@ -7,6 +7,7 @@
 #define _ASM_RISCV_PGTABLE_64_H
 
 #include <linux/const.h>
+#include <asm/andes.h>
 
 #define PGDIR_SHIFT     30
 /* Size of region mapped by a page global directory */
@@ -46,7 +47,7 @@ static inline int pud_bad(pud_t pud)
 static inline void set_pud(pud_t *pudp, pud_t pud)
 {
 	*pudp = pud;
-	local_flush_tlb_all();
+	andes_local_flush_tlb_all();
 }
 
 static inline void pud_clear(pud_t *pudp)
