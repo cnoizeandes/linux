@@ -65,6 +65,7 @@ void __init parse_dtb(void)
 #endif
 }
 
+bool andestar45;
 void __init setup_arch(char **cmdline_p)
 {
 	init_mm.start_code = (unsigned long) _stext;
@@ -73,6 +74,8 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk        = (unsigned long) _end;
 
 	*cmdline_p = boot_command_line;
+	long archid = sbi_get_marchid();
+	andestar45 = ((archid & 0xF0) >> 4 == 4 && (archid & 0xF) == 5)?true:false;
 
 	parse_early_param();
 
