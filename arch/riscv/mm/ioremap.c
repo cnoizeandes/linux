@@ -78,10 +78,14 @@ void __iomem *ioremap(phys_addr_t offset, size_t size)
 }
 EXPORT_SYMBOL(ioremap);
 
+struct pma_arg_t pma_arg;
+
 void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
 {
 	void __iomem *ret;
 	int i;
+	int cpu_num = num_online_cpus();
+	int id = smp_processor_id();
 
 	pgprot_t pgprot = pgprot_noncached(PAGE_KERNEL);
 	ret =  __ioremap_caller(offset, size, pgprot,
@@ -101,7 +105,26 @@ void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
 				break;
 			}
 		}
-		sbi_set_pma(offset, (unsigned long)ret, size);
+
+		// FIXME: this is not protected.
+		pma_arg.offset = offset;
+		pma_arg.vaddr = (unsigned long)ret;
+		pma_arg.size = size;
+		pma_arg.entryID = i;
+
+		/* send ipi*/
+		// FIXME: we need online CPU mask, not the number
+		for (i = 0; i < cpu_num; i++) {
+			if(i == id)
+				continue;
+			int err = smp_call_function_single(i, sbi_set_pma, 
+				(void*)&pma_arg, true);
+			if(err){
+				pr_err("Core %d fails to set pma\n"
+				"Error Code: %d \n", i, err);
+			}
+		}
+		sbi_set_pma(&pma_arg);
 	}
 #endif
 	return ret;
@@ -125,7 +148,7 @@ void iounmap(volatile void __iomem *addr)
 		for (i = 0; i < MAX_PMA; i++) {
 			if (pma_used[i] == (unsigned long)addr) {
 				pma_used[i] = 0;
-				sbi_free_pma((unsigned long)addr);
+				sbi_free_pma((unsigned long)i);
 				break;
 			}
 		}

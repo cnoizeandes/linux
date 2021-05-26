@@ -179,7 +179,7 @@ void sbi_suspend_mem(void);
 void sbi_restart(int cpu_num);
 void sbi_set_suspend_mode(int suspend_mode);
 void sbi_set_reset_vec(int val);
-void sbi_set_pma(phys_addr_t offset, unsigned long vaddr, size_t size);
+void sbi_set_pma(void *arg);
 void sbi_free_pma(unsigned long vaddr);
 long sbi_probe_pma(void);
 void sbi_write_powerbrake(int val);

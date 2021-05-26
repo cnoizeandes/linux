@@ -10,6 +10,14 @@
 #include <asm/andesv5/proc.h>
 #include <asm/sbi.h>
 
+/* sbi_set_pma arg struct */
+struct pma_arg_t{
+	phys_addr_t offset;
+	unsigned long vaddr;
+	size_t size;
+	size_t entry_id;
+};
+
 void sbi_suspend_prepare(char main_core, char enable)
 {
 	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SUSPEND_PREPARE, main_core, enable, 0, 0, 0, 0);
@@ -54,15 +62,19 @@ void sbi_set_reset_vec(int val)
 }
 EXPORT_SYMBOL(sbi_set_reset_vec);
 
-void sbi_set_pma(phys_addr_t offset, unsigned long vaddr, size_t size)
+void sbi_set_pma(void *arg)
 {
-	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_PMA, offset, vaddr, size, 0, 0, 0);
+	phys_addr_t offset = ((struct pma_arg_t*)arg)->offset;
+	unsigned long vaddr = ((struct pma_arg_t*)arg)->vaddr;
+	size_t size = ((struct pma_arg_t*)arg)->size;
+	size_t entry_id = ((struct pma_arg_t*)arg)->entry_id;
+	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_PMA, offset, vaddr, size, entry_id, 0, 0);
 }
 EXPORT_SYMBOL(sbi_set_pma);
 
-void sbi_free_pma(unsigned long vaddr)
+void sbi_free_pma(unsigned long entry_id)
 {
-	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_FREE_PMA, vaddr, 0, 0, 0, 0, 0);
+	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_FREE_PMA, entry_id, 0, 0, 0, 0, 0);
 }
 EXPORT_SYMBOL(sbi_free_pma);
 
