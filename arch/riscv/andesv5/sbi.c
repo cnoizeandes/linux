@@ -10,13 +10,6 @@
 #include <asm/andesv5/proc.h>
 #include <asm/sbi.h>
 
-/* sbi_set_pma arg struct */
-struct pma_arg_t{
-	phys_addr_t offset;
-	unsigned long vaddr;
-	size_t size;
-	size_t entry_id;
-};
 
 void sbi_suspend_prepare(char main_core, char enable)
 {
