@@ -9,6 +9,14 @@
 
 #ifdef CONFIG_RISCV_SBI
 
+struct pma_arg_t {
+	phys_addr_t offset;
+	unsigned long vaddr;
+	size_t size;
+	size_t entry_id;
+};
+
+
 enum sbi_ext_id {
 #ifdef CONFIG_RISCV_SBI_V01
 	SBI_EXT_0_1_SET_TIMER = 0x0,

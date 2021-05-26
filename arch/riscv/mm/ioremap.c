@@ -110,7 +110,7 @@ void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
 		pma_arg.offset = offset;
 		pma_arg.vaddr = (unsigned long)ret;
 		pma_arg.size = size;
-		pma_arg.entryID = i;
+		pma_arg.entry_id = i;
 
 		/* send ipi*/
 		// FIXME: we need online CPU mask, not the number
