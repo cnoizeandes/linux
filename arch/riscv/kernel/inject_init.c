@@ -20,7 +20,7 @@ static int inject_show(struct seq_file *m, void *v)
                 //do nothing
         } else if (inject != NULL) {
                 for (i = 0; i < INJECT_SIZE/PAGE_SIZE; i+=PAGE_SIZE) {
-                        seq_write(m, (void*)&p[i], PAGE_SIZE);
+                        seq_write(m, (void*)&p[i*PAGE_SIZE], PAGE_SIZE);
                 }
         } else {
                 seq_printf(m, "#!/bin/sh\necho not found: ioremap failed.\n");
