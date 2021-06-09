@@ -411,7 +411,8 @@ void __init ae300_add_device_i2c(struct i2c_board_info *devices, int nr_devices)
 /*
  * Main initialization routine.
  */
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val);
+extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
+	unsigned int shift_bits);
 
 static int atciic_probe(struct platform_device *pdev)
 {
@@ -449,7 +450,7 @@ static int atciic_probe(struct platform_device *pdev)
 		goto out_error_get_io;
 	}
 	/* Check ID and Revision Register */
-	ret = readl_fixup(iface->regs_base, 0x02021012);
+	ret = readl_fixup(iface->regs_base, 0x020210, 8);
 	if(!ret){
 		dev_err(&pdev->dev, "I2C version NOT match, bitmap not support atciic100\n");
 		rc = -ENXIO;

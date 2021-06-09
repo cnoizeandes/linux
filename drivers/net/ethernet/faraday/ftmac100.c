@@ -1101,7 +1101,8 @@ static const struct net_device_ops ftmac100_netdev_ops = {
 /******************************************************************************
  * struct platform_driver functions
  *****************************************************************************/
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val);
+extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
+	unsigned int shift_bits);
 
 static int ftmac100_probe(struct platform_device *pdev)
 {
@@ -1162,7 +1163,7 @@ static int ftmac100_probe(struct platform_device *pdev)
 	}
 
 	/*Check revision register*/
-	ret = readl_fixup(priv->base + FTMAC100_OFFSET_REVISION, 0x00010407);
+	ret = readl_fixup(priv->base + FTMAC100_OFFSET_REVISION, 0x00010407, 0);
 	if (!ret){
 		dev_err(&pdev->dev, "fail to read revision reg, bitmap not support ftmac100\n");
 		err = -EIO;
