@@ -23,6 +23,7 @@ ENTRY(readl_fixup)
 
 	fixup lw, t0, (a0), 2f
 	fence i,r
+	srl  t0, t0, a2
 	bne  t0, a1, error
 	li a0, 1
 	ret

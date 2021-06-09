@@ -1421,7 +1421,8 @@ static int ftssp_alsa_i2c_i2s_exit(void)
 	return 0;
 }
 
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val);
+extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
+	unsigned int shift_bits);
 
 static int atf_ac97_probe(struct platform_device *pdev)
 {
@@ -1436,7 +1437,7 @@ static int atf_ac97_probe(struct platform_device *pdev)
 	ssp2_vbase = (resource_size_t)(unsigned long)ioremap(mem->start, mem_size);
 
 	/* Check SSP revision register */
-	ret = readl_fixup((void __iomem *)(unsigned long)ssp2_vbase + 0x40,  0x00011506);
+	ret = readl_fixup((void __iomem *)(unsigned long)ssp2_vbase + 0x40,  0x00011506, 0);
 	if (!ret){
 		ERR("%s: fail to read revision reg, bitmap no support ftssp \n", __func__);
 		return -ENXIO;

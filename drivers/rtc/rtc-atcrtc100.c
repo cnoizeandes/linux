@@ -217,7 +217,8 @@ const static struct rtc_class_ops rtc_ops = {
 	.set_alarm	= atc_rtc_set_alarm,
 };
 
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val);
+extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
+	unsigned int shift_bits);
 static int atc_rtc_probe(struct platform_device *pdev)
 {
 	struct atc_rtc *rtc = &rtc_platform_data;
@@ -262,8 +263,8 @@ static int atc_rtc_probe(struct platform_device *pdev)
 	if (!rtc->regbase)
 		goto err_ioremap1;
 
-	/* Check ID and Revision register */
-	ret = readl_fixup(rtc->regbase, 0x03011006);
+	/* Check ID and Revision register 0x030110*/
+	ret = readl_fixup(rtc->regbase, 0x030110, 8);
 	if (!ret){
 		dev_err(&pdev->dev, "failed read ID register, bitmap not support atcrtc100\n");
 		return -ENOENT;
