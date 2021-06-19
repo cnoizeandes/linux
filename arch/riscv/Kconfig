@@ -251,14 +251,6 @@ config NR_CPUS
 	depends on SMP
 	default "8"
 
-config IPI_CACHE_OP
-	bool "Support sending IPI to flush/inval for CPUs"
-	depends on SMP
-	default y
-	help
-	  It is necessary to flush and invalidate cache for all CPUs
-	  during DMA transcations without coherent agent in SMP system.
-
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"
 	depends on SMP

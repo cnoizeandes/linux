@@ -29,44 +29,24 @@
 static void dma_flush_page(struct page *page, size_t size)
 {
 	unsigned long k_d_vaddr;
-	struct range_info ri;
-
 	/*
 	 * Invalidate any data that might be lurking in the
 	 * kernel direct-mapped region for device DMA.
 	 */
 	k_d_vaddr = (unsigned long)page_address(page);
 	memset((void *)k_d_vaddr, 0, size);
+	cpu_dma_wb_range(k_d_vaddr, k_d_vaddr + size);
+	cpu_dma_inval_range(k_d_vaddr, k_d_vaddr + size);
 
-	ri.start = k_d_vaddr;
-	ri.end = k_d_vaddr + size;
-	cpu_dma_wb_range((void *)&ri);
-	cpu_dma_inval_range((void *)&ri);
 }
-
-#ifdef CONFIG_IPI_CACHE_OP
-static void ipi_cache_op(void (*fn)(void *ri), void *ri)
-{
-	int cpu_num = num_online_cpus();
-	int i, ret;
-
-	for(i = 0; i < cpu_num; i++){
-	    ret = smp_call_function_single(i, fn,ri, true);
-	    if(ret)
-		pr_err("Core %d cache op Fail\n"
-			"Error Code:%d \n", i, ret);
-	}
-}
-#endif
 
 static inline void cache_op(phys_addr_t paddr, size_t size,
-		void (*fn)(void *ri))
+		void (*fn)(unsigned long start, unsigned long end))
 {
     struct page *page = pfn_to_page(paddr >> PAGE_SHIFT);
     unsigned offset = paddr & ~PAGE_MASK;
     size_t left = size;
     unsigned long start;
-    struct range_info ri;
 
     do {
         size_t len = left;
@@ -84,23 +64,11 @@ static inline void cache_op(phys_addr_t paddr, size_t size,
 
             addr = kmap_atomic(page);
             start = (unsigned long)(addr + offset);
-            ri.start = start;
-            ri.end = start + len;
-#ifdef CONFIG_IPI_CACHE_OP
-            ipi_cache_op(fn, &ri);
-#else
-            fn((struct range_info *)&ri);
-#endif
+            fn(start, start + len);
             kunmap_atomic(addr);
         } else {
             start = (unsigned long)phys_to_virt(paddr);
-            ri.start = start;
-            ri.end = start + size;
-#ifdef CONFIG_IPI_CACHE_OP
-            ipi_cache_op(fn, &ri);
-#else
-            fn((struct range_info *)&ri);
-#endif
+            fn(start, start + size);
         }
         offset = 0;
         page++;

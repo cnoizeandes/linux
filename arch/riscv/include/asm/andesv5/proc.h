@@ -24,8 +24,8 @@ void sbi_disable_l1d_cache(void);
 void sbi_set_mcache_ctl(unsigned long input);
 void sbi_set_mmisc_ctl(unsigned long input);
 
-void cpu_dma_inval_range(void *info);
-void cpu_dma_wb_range(void *info);
+void cpu_dma_inval_range(unsigned long start, unsigned long end);
+void cpu_dma_wb_range(unsigned long start, unsigned long end);
 void cpu_l2c_inval_range(unsigned long pa, unsigned long size);
 void cpu_l2c_wb_range(unsigned long pa, unsigned long size);
 
@@ -40,9 +40,4 @@ void cpu_l2c_wb_range(unsigned long pa, unsigned long size);
 struct andesv5_cache_info {
 	bool init_done;
 	int dcache_line_size;
-};
-
-struct range_info {
-	unsigned long start;
-	unsigned long end;
 };

@@ -102,13 +102,10 @@ void cpu_dcache_inval_range(unsigned long start, unsigned long end, int line_siz
 	}
     put_cpu();
 }
-void cpu_dma_inval_range(void *info)
+void cpu_dma_inval_range(unsigned long start, unsigned long end)
 {
         unsigned long flags;
         unsigned long line_size = get_cache_line_size();
-	struct range_info *ri = info;
-	unsigned long start = ri->start;
-	unsigned long end = ri->end;
 	unsigned long old_start = start;
 	unsigned long old_end = end;
 	char cache_buf[2][MAX_CACHE_LINE_SIZE]={0};
@@ -138,13 +135,10 @@ void cpu_dma_inval_range(void *info)
 }
 EXPORT_SYMBOL(cpu_dma_inval_range);
 
-void cpu_dma_wb_range(void *info)
+void cpu_dma_wb_range(unsigned long start, unsigned long end)
 {
 	unsigned long flags;
 	unsigned long line_size = get_cache_line_size();
-	struct range_info *ri = info;
-	unsigned long start = ri->start;
-	unsigned long end = ri->end;
 
         local_irq_save(flags);
 	start = start & (~(line_size - 1));
