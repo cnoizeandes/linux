@@ -13,14 +13,14 @@
 void *inject;
 static int inject_show(struct seq_file *m, void *v)
 {
-        int i;
+        int i, pos;
         unsigned char *p = (unsigned char *)inject;
 
         if (inject != NULL && p[0] == 0) {
                 //do nothing
         } else if (inject != NULL) {
-                for (i = 0; i < INJECT_SIZE/PAGE_SIZE; i+=PAGE_SIZE) {
-                        seq_write(m, (void*)&p[i*PAGE_SIZE], PAGE_SIZE);
+                for (i = 0, pos = 0; i < INJECT_SIZE/PAGE_SIZE; i++, pos+=PAGE_SIZE) {
+                        seq_write(m, (void*)&p[pos], PAGE_SIZE);
                 }
         } else {
                 seq_printf(m, "#!/bin/sh\necho not found: ioremap failed.\n");
