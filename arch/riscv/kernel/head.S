@@ -194,12 +194,11 @@ clear_bss_done:
 	REG_S a0, (a2)
 
 	/* Initialize page tables and relocate to virtual addresses */
-	la t0, init_thread_union + THREAD_SIZE
-	mv sp, t0
+	la sp, init_thread_union + THREAD_SIZE
+	call setup_maxpa
 
 	/* Pass DTB addr to setup_vm */
 	mv a0, s1
-	call setup_maxpa
 	call setup_vm
 	la a0, early_pg_dir
 	call relocate
