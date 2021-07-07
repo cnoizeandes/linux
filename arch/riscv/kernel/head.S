@@ -194,7 +194,7 @@ clear_bss_done:
 	REG_S a0, (a2)
 
 	/* Initialize page tables and relocate to virtual addresses */
-	la t0, init_thread_union + THREAD_SIZE 
+	la t0, init_thread_union + THREAD_SIZE
 	mv sp, t0
 	call setup_maxpa
 
