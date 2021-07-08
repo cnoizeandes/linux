@@ -1226,6 +1226,58 @@ static int ftmac100_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int ftmac100_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct net_device *netdev = platform_get_drvdata(pdev);
+	struct ftmac100 *priv = netdev_priv(netdev);
+
+	if (!netif_running(netdev))
+		return 0;
+
+	pr_info("ftmac100_suspend() ...\n");
+
+	ftmac100_disable_all_int(priv);
+
+	netif_stop_queue(netdev);
+
+	napi_disable(&priv->napi);
+
+	netif_tx_lock(netdev);
+	netif_device_detach(netdev);
+	netif_tx_unlock(netdev);
+
+	ftmac100_stop_hw(priv);
+
+	return 0;
+}
+
+static int ftmac100_resume(struct platform_device *pdev)
+{
+	struct net_device *netdev = platform_get_drvdata(pdev);
+	struct ftmac100 *priv = netdev_priv(netdev);
+
+	if (!netif_running(netdev))
+		return 0;
+
+	pr_info("ftmac100_resume() ...\n");
+
+	iowrite32(MACCR_ENABLE_ALL, priv->base + FTMAC100_OFFSET_MACCR);
+
+	napi_enable(&priv->napi);
+
+	netif_tx_lock(netdev);
+	netif_device_attach(netdev);
+	netif_tx_unlock(netdev);
+
+	netif_start_queue(netdev);
+
+	ftmac100_enable_all_int(priv);
+
+    return 0;
+}
+#endif /* CONFIG_PM */
+
 static const struct of_device_id ftmac100_of_ids[] = {
 	{ .compatible = "andestech,atmac100" },
 	{ }
@@ -1238,6 +1290,10 @@ static struct platform_driver ftmac100_driver = {
 		.name	= DRV_NAME,
 		.of_match_table = ftmac100_of_ids
 	},
+#ifdef CONFIG_PM
+	.suspend	= ftmac100_suspend,
+	.resume		= ftmac100_resume,
+#endif /* CONFIG_PM */
 };
 
 /******************************************************************************
