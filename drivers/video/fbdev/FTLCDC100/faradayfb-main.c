@@ -11,7 +11,7 @@
 #include "lcd-info.c"
 #include "pingpong-module.c"
 
-
+#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
 #define REG32(a)        (*(volatile unsigned int *)(a))
 static resource_size_t	lcd_base;
 
@@ -387,6 +387,16 @@ static void set_ctrlr_state(struct fb_info *info, unsigned int state)
 
 	switch (state) {
 		case C_DISABLE_PM:
+			/* Disable controller */
+			if (old_state != C_DISABLE) {
+
+				fbi->state = state;
+				faradayfb_disable_int(info);
+				faradayfb_lcd_power(info, 0);
+				faradayfb_disable_controller(info);
+			}
+			break;
+
 		case C_DISABLE:
 
 			/* Disable controller */
@@ -424,8 +434,14 @@ static void set_ctrlr_state(struct fb_info *info, unsigned int state)
 			 * perfect - think about the case where we were doing
 			 * a clock change, and we suspended half-way through.
 			 */
-			if (old_state != C_DISABLE_PM)
-				break;
+			if (old_state != C_DISABLE_PM) {
+				fbi->state = C_ENABLE;
+				faradayfb_setup_gpio(info);
+				faradayfb_lcd_power(info, 1);
+				faradayfb_enable_controller(info);
+				faradayfb_enable_int(info);
+			}
+			break;
 			/* fall through */
 
 		case C_ENABLE:
@@ -701,6 +717,8 @@ static int faradayfb_probe(struct platform_device *pdev)
 	int ret = -ENODEV;
 	struct resource	*io;
 
+	pr_info("faradayfb_probe() ...\n");
+
 	if ((io = platform_get_resource(pdev, IORESOURCE_MEM, 0)) == NULL ) {
 		dev_err(&pdev->dev, "Failed to get memory resource\n");
 		goto err_exit;
@@ -782,6 +800,32 @@ static int faradayfb_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int faradayfb_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct fb_info  *info;
+	info = platform_get_drvdata(pdev);
+
+	pr_info("faradayfb_suspend() ...\n");
+
+	set_ctrlr_state(info, C_DISABLE_PM);
+
+	return 0;
+}
+
+static int faradayfb_resume(struct platform_device *pdev)
+{
+	struct fb_info  *info;
+	info = platform_get_drvdata(pdev);
+
+	pr_info("faradayfb_resume() ...\n");
+
+	set_ctrlr_state(info, C_ENABLE_PM);
+
+    return 0;
+}
+#endif /* CONFIG_PM */
+
 static struct of_device_id atflcd_of_match[] = {
 	{ .compatible = "andestech,atflcdc100", },
 	{},
@@ -796,6 +840,10 @@ static struct platform_driver atflcd_of_driver = {
 		.owner = THIS_MODULE,
 		.of_match_table = atflcd_of_match,
 	},
+#ifdef CONFIG_PM
+	.suspend = faradayfb_suspend,
+	.resume = faradayfb_resume,
+#endif /* CONFIG_PM */
 };
 
 module_platform_driver(atflcd_of_driver);
