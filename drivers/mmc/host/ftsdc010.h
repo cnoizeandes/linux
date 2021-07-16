@@ -213,6 +213,9 @@ struct ftsdc_host {
 	u32			buf_bytes;	/* keep current total scallterlist buffer length */
 	u32			buf_count;	/* keep real data size rw from sd */
 	u32			*buf_ptr;	/* keep current scallterlist buffer address */
+	u32			page_cnt;
+	struct page *		buf_page;
+	unsigned long		buf_offset;
 #define XFER_NONE 0
 #define XFER_READ 1
 #define XFER_WRITE 2

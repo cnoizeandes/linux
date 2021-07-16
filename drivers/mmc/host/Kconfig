@@ -561,6 +561,12 @@ config MMC_FTSDC
 	  If you have an DAVINCI board with a Multimedia Card slot,
 	  say Y or M here.  If unsure, say N.
 
+config MMC_FTSDC_DMA
+	bool "DMA mode"
+	depends on MMC_FTSDC
+	default y
+	help
+	  This selects the Andestech SDC work in DMA mode.
 
 config MMC_GOLDFISH
 	tristate "goldfish qemu Multimedia Card Interface support"

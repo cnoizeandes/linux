@@ -24,6 +24,8 @@
 #include <asm/dmad.h>
 #include "ftsdc010.h"
 #include "../core/core.h"
+#include <linux/highmem.h>
+#include <linux/kernel.h>
 
 #define DRIVER_NAME "ftsdc010"
 #define REG_READ(addr) readl((host->base + addr))
@@ -207,11 +209,18 @@ static inline void get_data_buffer(struct ftsdc_host *host)
 	struct scatterlist *sg;
 
 	BUG_ON(host->buf_sgptr >= host->mrq->data->sg_len);
-
 	sg = &host->mrq->data->sg[host->buf_sgptr];
-
+	host->buf_page = 0;
 	host->buf_bytes = sg->length;
 	host->buf_ptr = host->dodma ? (u32 *)(unsigned long)sg->dma_address : sg_virt(sg);
+#ifdef CONFIG_HIGHMEM
+	if (PageHighMem(sg_page(sg))) {
+		host->buf_page = sg_page(sg);
+		host->buf_offset = sg->offset;
+		if(!host->dodma)
+			host->buf_ptr = 0;
+	}
+#endif
 	host->buf_sgptr++;
 }
 
@@ -255,51 +264,60 @@ static void do_pio_read(struct ftsdc_host *host)
 {
 	u32 fifo;
 	u32 fifo_words;
-	u32 *ptr;
+	u32 *ptr = 0;
+	void *tptr = 0;
 	u32 status;
 	u32 retry = 0;
-
 	BUG_ON(host->buf_bytes != 0);
 
 	while (host->buf_sgptr < host->mrq->data->sg_len) {
 		get_data_buffer(host);
-
-		dbg(host, dbg_pio,
-		    "pio_read(): new target: [%i]@[%p]\n",
-		    host->buf_bytes, host->buf_ptr);
-
+		tptr = host->buf_ptr;
 		while (host->buf_bytes) {
-			status = REG_READ(SDC_STATUS_REG);
-			if (status & SDC_STATUS_REG_FIFO_OVERRUN) {
-				fifo = host->fifo_len > host->buf_bytes ?
-					host->buf_bytes : host->fifo_len;
-				dbg(host, dbg_pio,
-				    "pio_read(): fifo:[%02i] buffer:[%03i] dcnt:[%08X]\n",
-				    fifo, host->buf_bytes,
-				    REG_READ(SDC_DATA_LEN_REG));
-				host->buf_bytes -= fifo;
-				host->buf_count += fifo;
-				fifo_words = fifo >> 2;
-				ptr = host->buf_ptr;
-				while (fifo_words--)
-					*ptr++ = REG_READ(SDC_DATA_WINDOW_REG);
-				host->buf_ptr = ptr;
-				if (fifo & 3) {
-					u32 n = fifo & 3;
-					u32 data = REG_READ(SDC_DATA_WINDOW_REG);
-					u8 *p = (u8 *)host->buf_ptr;
-
-					while (n--) {
-						*p++ = data;
-						data >>= 8;
+			host->page_cnt = host->buf_bytes;
+			if(host->buf_page != 0) {
+				host->buf_ptr = kmap_atomic(host->buf_page);
+				tptr = host->buf_ptr;
+				tptr +=  host->buf_offset;
+				host->page_cnt = min((u32)(PAGE_SIZE-host->buf_offset), host->buf_bytes);
+				host->buf_offset = 0;
+			}
+			host->buf_bytes -= host->page_cnt;
+			ptr = tptr;
+			while (host->page_cnt) {
+				status = REG_READ(SDC_STATUS_REG);
+				if (status & SDC_STATUS_REG_FIFO_OVERRUN) {
+					fifo = host->fifo_len > host->page_cnt ?
+						host->page_cnt : host->fifo_len;
+					dbg(host, dbg_pio,
+						"pio_read(): fifo:[%02i] buffer:[%03i] dcnt:[%08X]\n",
+						fifo, host->page_cnt,
+					REG_READ(SDC_DATA_LEN_REG));
+					host->page_cnt -= fifo;
+					host->buf_count += fifo;
+					fifo_words = fifo >> 2;
+					while (fifo_words--)
+						*ptr++ = REG_READ(SDC_DATA_WINDOW_REG);
+					if (fifo & 3) {
+						u32 n = fifo & 3;
+						u32 data = REG_READ(SDC_DATA_WINDOW_REG);
+						u8 *p = (u8 *)ptr;
+						while (n--) {
+							*p++ = data;
+							data >>= 8;
+						}
+					}
+				} else {
+					udelay(1);
+					if (++retry >= SDC_PIO_RETRY) {
+						host->mrq->data->error = -EIO;
+						goto err;
 					}
 				}
-			} else {
-				udelay(1);
-				if (++retry >= SDC_PIO_RETRY) {
-					host->mrq->data->error = -EIO;
-					goto err;
-				}
+			}
+			if(host->buf_page != 0) {
+				kunmap_atomic(host->buf_ptr);
+				host->buf_page++;
 			}
 		}
 	}
@@ -313,49 +331,58 @@ static void do_pio_write(struct ftsdc_host *host)
 {
 	u32 fifo;
 	u32 *ptr;
+	void *tptr;
 	u32 status;
 	u32 retry = 0;
 
 	BUG_ON(host->buf_bytes != 0);
-
 	while (host->buf_sgptr < host->mrq->data->sg_len) {
 		get_data_buffer(host);
-
 		dbg(host, dbg_pio,
 		    "pio_write(): new source: [%i]@[%p]\n",
 		    host->buf_bytes, host->buf_ptr);
-
 		while (host->buf_bytes) {
-			status = REG_READ(SDC_STATUS_REG);
-			if (status & SDC_STATUS_REG_FIFO_UNDERRUN) {
-				fifo = host->fifo_len > host->buf_bytes ?
-					host->buf_bytes : host->fifo_len;
-
-				dbg(host, dbg_pio,
-				    "pio_write(): fifo:[%02i] buffer:[%03i] dcnt:[%08X]\n",
-				    fifo, host->buf_bytes,
-				    REG_READ(SDC_DATA_LEN_REG));
-
-				host->buf_bytes -= fifo;
-				host->buf_count += fifo;
-
-				fifo = (fifo + 3) >> 2;
-				ptr = host->buf_ptr;
-				while (fifo--) {
-					REG_WRITE(*ptr, SDC_DATA_WINDOW_REG);
-					ptr++;
+			host->page_cnt = host->buf_bytes;
+			tptr = host->buf_ptr;
+			if(host->buf_page != 0) {
+				host->buf_ptr = kmap_atomic(host->buf_page);
+				host->page_cnt = min((u32)(PAGE_SIZE-host->buf_offset), host->page_cnt);
+				tptr = host->buf_ptr;
+				tptr += host->buf_offset;
+				host->buf_offset = 0;
+			}
+			host->buf_bytes -= host->page_cnt;
+			ptr = tptr;
+			while (host->page_cnt) {
+				status = REG_READ(SDC_STATUS_REG);
+				if (status & SDC_STATUS_REG_FIFO_UNDERRUN) {
+					fifo = host->fifo_len > host->page_cnt ?
+						host->page_cnt : host->fifo_len;
+					dbg(host, dbg_pio,
+						"pio_write(): fifo:[%02i] buffer:[%03i] dcnt:[%08X]\n",
+						fifo, host->buf_bytes,
+					REG_READ(SDC_DATA_LEN_REG));
+					host->page_cnt -= fifo;
+					host->buf_count += fifo;
+					fifo = (fifo + 3) >> 2;
+					while (fifo--) {
+						REG_WRITE(*ptr, SDC_DATA_WINDOW_REG);
+						ptr++;
+					}
+				} else {
+					udelay(1);
+					if (++retry >= SDC_PIO_RETRY) {
+						host->mrq->data->error = -EIO;
+						goto err;
+					}
 				}
-				host->buf_ptr = ptr;
-			} else {
-				udelay(1);
-				if (++retry >= SDC_PIO_RETRY) {
-					host->mrq->data->error = -EIO;
-					goto err;
-				}
+			}
+			if(host->buf_page != 0) {
+				kunmap_atomic(host->buf_ptr);
+				host->buf_page++;
 			}
 		}
 	}
-
 err:
 	host->buf_active = XFER_NONE;
 	host->complete_what = COMPLETION_FINALIZE;
@@ -1430,7 +1457,9 @@ static int __init ftsdc_probe(struct platform_device *pdev)
 		mmc->caps |= MMC_CAP_8_BIT_DATA;
 
 #if (defined(CONFIG_PLATFORM_AHBDMA) || defined(CONFIG_PLATFORM_APBDMA))
+#ifdef CONFIG_MMC_FTSDC_DMA
 	ftsdc_alloc_dma(host);
+#endif
 #endif
 
 #ifndef A320D_BUILDIN_SDC
