@@ -61,16 +61,19 @@ static uint32_t cpu_l2c_get_cctl_status(void)
 	return readl((void*)(l2c_base + L2C_REG_STATUS_OFFSET));
 }
 
-void cpu_dcache_wb_range(unsigned long start, unsigned long end, int line_size)
+void cpu_dcache_wb_range(unsigned long start, unsigned long end, int line_size, struct page *page)
 {
 	int mhartid = get_cpu();
-	unsigned long pa;
+	unsigned long pa = page_to_phys(page);
+
+	if(start & (~PAGE_MASK))
+		pa += start & ~PAGE_MASK;
+
 	while (end > start) {
 		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
 		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_WB);
 
 		if (l2c_base) {
-			pa = virt_to_phys((volatile void *)start);
 			writel(pa, (void*)(l2c_base + L2C_REG_CN_ACC_OFFSET(mhartid)));
 			writel(CCTL_L2_PA_WB, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
 			while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
@@ -78,20 +81,25 @@ void cpu_dcache_wb_range(unsigned long start, unsigned long end, int line_size)
 		}
 
 		start += line_size;
+		pa += line_size;
+
 	}
     put_cpu();
 }
 
-void cpu_dcache_inval_range(unsigned long start, unsigned long end, int line_size)
+void cpu_dcache_inval_range(unsigned long start, unsigned long end, int line_size, struct page *page)
 {
 	int mhartid = get_cpu();
-	unsigned long pa;
+	unsigned long pa = page_to_phys(page);
+
+	if(start & (~PAGE_MASK))
+		pa += start & ~PAGE_MASK;
+
 	while (end > start) {
 		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
 		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_INVAL);
 
 		if (l2c_base) {
-			pa = virt_to_phys((volatile void *)start);
 			writel(pa, (void*)(l2c_base + L2C_REG_CN_ACC_OFFSET(mhartid)));
 			writel(CCTL_L2_PA_INVAL, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
 			while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
@@ -99,13 +107,17 @@ void cpu_dcache_inval_range(unsigned long start, unsigned long end, int line_siz
 		}
 
 		start += line_size;
+		pa += line_size;
 	}
     put_cpu();
 }
-void cpu_dma_inval_range(unsigned long start, unsigned long end)
+void cpu_dma_inval_range(void *info)
 {
         unsigned long flags;
         unsigned long line_size = get_cache_line_size();
+	struct range_info *ri = info;
+	unsigned long start = ri->start;
+	unsigned long end = ri->end;
 	unsigned long old_start = start;
 	unsigned long old_end = end;
 	char cache_buf[2][MAX_CACHE_LINE_SIZE]={0};
@@ -123,7 +135,7 @@ void cpu_dma_inval_range(unsigned long start, unsigned long end)
 	if (unlikely(end != old_end)) {
 		memcpy(&cache_buf[1][0], (void *)(old_end & (~(line_size - 1))), line_size);
 	}
-	cpu_dcache_inval_range(start, end, line_size);
+	cpu_dcache_inval_range(start, end, line_size, ri->page);
 	if (unlikely(start != old_start)) {
 		memcpy((void *)start, &cache_buf[0][0], (old_start & (line_size - 1)));
 	}
@@ -135,14 +147,17 @@ void cpu_dma_inval_range(unsigned long start, unsigned long end)
 }
 EXPORT_SYMBOL(cpu_dma_inval_range);
 
-void cpu_dma_wb_range(unsigned long start, unsigned long end)
+void cpu_dma_wb_range(void *info)
 {
 	unsigned long flags;
 	unsigned long line_size = get_cache_line_size();
+	struct range_info *ri = info;
+	unsigned long start = ri->start;
+	unsigned long end = ri->end;
 
         local_irq_save(flags);
 	start = start & (~(line_size - 1));
-	cpu_dcache_wb_range(start, end, line_size);
+	cpu_dcache_wb_range(start, end, line_size, ri->page);
         local_irq_restore(flags);
 }
 EXPORT_SYMBOL(cpu_dma_wb_range);
