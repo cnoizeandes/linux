@@ -641,7 +641,6 @@ config CLKSRC_ST_LPC
 config ATCPIT100_TIMER
 	bool "ATCPIT100 timer driver"
 	depends on GENERIC_SCHED_CLOCK && RISCV
-	default y
 	select CLKSRC_MMIO
 	depends on HAS_IOMEM
 	select TIMER_PROBE
