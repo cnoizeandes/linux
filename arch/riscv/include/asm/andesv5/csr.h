@@ -108,6 +108,10 @@
 #define L2C_REG_CN_HPM_OFFSET(n)	\
 	L2C_REG_C0_HPM_OFFSET + (n * L2C_HPM_PER_CORE_OFFSET)
 
+
+/* Debug/Trace Registers (shared with Debug Mode) */
+#define CSR_SCONTEXT            0x7aa
+
 /* Supervisor trap registers */
 #define CSR_SLIE				0x9c4
 #define CSR_SLIP				0x9c5

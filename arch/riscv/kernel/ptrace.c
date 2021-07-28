@@ -178,9 +178,9 @@ void do_singlestep(void)
 {
 	if (test_thread_flag(TIF_SINGLESTEP)) {
 		sbi_set_trigger(TRIGGER_TYPE_ICOUNT, ICOUNT, 1);
-		csr_write(scontext, 1);
+		csr_write(CSR_SCONTEXT, 1);
 	} else {
-		csr_write(scontext, 0);
+		csr_write(CSR_SCONTEXT, 0);
 	}
 }
 /*
