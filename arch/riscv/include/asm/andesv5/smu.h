@@ -79,8 +79,9 @@ void andes_suspend2ram(void);
 //other hart (arch/riscv/kernel/cpu-hotplug.c)
 void atcsmu100_set_suspend_mode(void);
 
-#define NormalMode				0
+#define NormalMode              0
 #define LightSleepMode          1
-#define DeepSleepMode          	2
+#define DeepSleepMode           2
+#define CpuHotplugDeepSleepMode 3
 
 #endif
