@@ -169,6 +169,8 @@ void atcsmu100_set_suspend_mode(void)
 		sbi_set_suspend_mode(DeepSleepMode);
 	}else if(suspend_begin == PM_SUSPEND_STANDBY){
 		sbi_set_suspend_mode(LightSleepMode);
+	}else {
+		sbi_set_suspend_mode(CpuHotplugDeepSleepMode);
 	}
 }
 #endif
