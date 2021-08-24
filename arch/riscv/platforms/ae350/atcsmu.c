@@ -19,157 +19,30 @@ extern int suspend_begin;
 
 struct atc_smu atcsmu;
 EXPORT_SYMBOL(atcsmu);
-int get_pd_type(unsigned int cpu)
-{
-	struct atc_smu *smu = &atcsmu;
-	unsigned int val = readl((void *)(smu->base +
-				CN_PCS_STATUS_OFF(cpu)));
 
-	return GET_PD_TYPE(val);
-}
-
-int get_pd_status(unsigned int cpu)
-{
-	struct atc_smu *smu = &atcsmu;
-	unsigned int val = readl((void *)(smu->base +
-				CN_PCS_STATUS_OFF(cpu)));
-
-	return GET_PD_STATUS(val);
-}
-
-void set_wakeup_enable(int cpu, unsigned int events)
-{
-	struct atc_smu *smu = &atcsmu;
-	if (cpu == 0)
-		events |= (1 << PCS_WAKE_DBG_OFF);
-	writel(events, (void *)(smu->base + CN_PCS_WE_OFF(cpu)));
-}
-
-void set_sleep(int cpu, unsigned char sleep)
-{
-	struct atc_smu *smu = &atcsmu;
-	unsigned int val = readl((void *)(smu->base + CN_PCS_CTL_OFF(cpu)));
-	unsigned char *ctl = (unsigned char *)&val;
-
-	// set sleep cmd
-	*ctl = 0;
-	*ctl = *ctl | SLEEP_CMD;
-	// set param
-	*ctl = *ctl | (sleep << PCS_CTL_PARAM_OFF);
-	writel(val, (void *)(smu->base + CN_PCS_CTL_OFF(cpu)));
-
-	pr_debug("PCS%d after setting up PCS_CTL register:\n"
-	       "PCS_WE: 0x%x\n"
-	       "The value wants to write into PCS_CTL:%x\n"
-	       "PCS_CTL: 0x%x\n"
-	       "PCS_STATUS: 0x%x\n",
-		cpu + 3,
-		readl((void *)(smu->base + CN_PCS_WE_OFF(cpu))),
-		val,
-		readl((void *)(smu->base + CN_PCS_CTL_OFF(cpu))),
-		readl((void *)(smu->base + CN_PCS_STATUS_OFF(cpu))));
-
-}
-
+#ifdef CONFIG_ATCSMU
 // main hart
 extern int num_cpus;
 void andes_suspend2ram(void)
 {
-	unsigned int cpu, status, type;
-	int ready_cnt = num_cpus - 1;
-	int ready_cpu[NR_CPUS] = {0};
-#ifdef CONFIG_SMP
-	int id = smp_processor_id();
-#else
-	int id = 0;
-#endif
-	// Disable higher privilege's non-wakeup event
-	sbi_suspend_prepare(true, false);
-
-	// polling SMU other CPU's PD_status
-	while (ready_cnt) {
-		for (cpu = 0; cpu < num_cpus; cpu++) {
-			if (cpu == id || ready_cpu[cpu] == 1)
-				continue;
-
-			type = get_pd_type(cpu);
-			status = get_pd_status(cpu);
-
-			if(type == SLEEP && status == DeepSleep_STATUS) {
-				ready_cnt--;
-				ready_cpu[cpu] = 1;
-			}
-		}
-	}
-
-	// set SMU wakeup enable & MISC control
-	set_wakeup_enable(id, *wake_mask);
-	// set SMU light sleep command
-	set_sleep(id, DeepSleep_CTL);
-	// backup, suspend and resume
-	sbi_suspend_mem();
-	// enable privilege
-	sbi_suspend_prepare(true, true);
+	sbi_enter_suspend_mode(DeepSleepMode, true, *wake_mask, num_cpus);
 }
 
 
 // main hart
 void andes_suspend2standby(void)
 {
-	unsigned int cpu, status, type;
-	int ready_cnt = num_cpus - 1;
-	int ready_cpu[NR_CPUS] = {0};
-#ifdef CONFIG_SMP
-	int id = smp_processor_id();
-#else
-	int id = 0;
-#endif
-	// Disable higher privilege's non-wakeup event
-	sbi_suspend_prepare(true, false);
-
-	// polling SMU other CPU's PD_status
-	while (ready_cnt) {
-		for (cpu = 0; cpu < num_cpus; cpu++) {
-			if (cpu == id || ready_cpu[cpu] == 1)
-				continue;
-
-			type = get_pd_type(cpu);
-			status = get_pd_status(cpu);
-
-			if(type == SLEEP && status == LightSleep_STATUS) {
-				ready_cnt--;
-				ready_cpu[cpu] = 1;
-			}
-		}
-	}
-	// set SMU wakeup enable & MISC control
-	set_wakeup_enable(id, *wake_mask);
-
-	// set SMU light sleep command
-	set_sleep(id, LightSleep_CTL);
-
-	// flush dcache & dcache off
-	cpu_dcache_disable(NULL);
-
-	// wfi
-	wait_for_interrupt();
-
-	// enable D-cache
-	cpu_dcache_enable(NULL);
-
-	// enable privilege
-	sbi_suspend_prepare(true, true);
+	sbi_enter_suspend_mode(LightSleepMode, true, *wake_mask, num_cpus);
 }
 
-#ifdef CONFIG_ATCSMU
 // other harts
 void atcsmu100_set_suspend_mode(void)
 {
 	if (suspend_begin == PM_SUSPEND_MEM) {
 		sbi_set_suspend_mode(DeepSleepMode);
-	}else if(suspend_begin == PM_SUSPEND_STANDBY){
+	} else if (suspend_begin == PM_SUSPEND_STANDBY) {
 		sbi_set_suspend_mode(LightSleepMode);
-	}else {
+	} else {
 		sbi_set_suspend_mode(CpuHotplugDeepSleepMode);
 	}
 }
@@ -232,7 +105,7 @@ static int atcsmu_probe(struct platform_device *pdev)
 	if (!smu->base)
 		goto err_ioremap;
 
-	for(pcs = 0; pcs < MAX_PCS_SLOT; pcs++)
+	for (pcs = 0; pcs < MAX_PCS_SLOT; pcs++)
 		writel(0xffdfffff, (void *)(smu->base + PCSN_WE_OFF(pcs)));
 
 	register_restart_handler(&atcsmu100_restart);
