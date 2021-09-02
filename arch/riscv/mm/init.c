@@ -180,14 +180,15 @@ void __init setup_bootmem(void)
 	/* Reserve from the start of the kernel to the end of the kernel */
 	memblock_reserve(vmlinux_start, vmlinux_end - vmlinux_start);
 
-	set_max_mapnr(PFN_DOWN(mem_size));
 #ifdef CONFIG_HIGHMEM
+	set_max_mapnr(PFN_DOWN(mem_size));
 	max_low_pfn = (PFN_DOWN(__pa(LOWMEM_END)));
 	max_pfn = PFN_DOWN(memblock_end_of_DRAM());
 	memblock_set_current_limit(__pa(LOWMEM_END));
 #else
 	max_pfn = PFN_DOWN(memblock_end_of_DRAM());
 	max_low_pfn = max_pfn;
+	set_max_mapnr(max_low_pfn);
 #endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	setup_initrd();
