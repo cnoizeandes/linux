@@ -92,16 +92,12 @@ static int riscv_cpufreq_set_policy(struct cpufreq_policy *policy)
 	return smp_call_function_single(cpu, write_powerbrake, &val, 1);
 }
 
-static int riscv_cpufreq_verify_policy(struct cpufreq_policy *policy)
+static int riscv_cpufreq_verify_policy(struct cpufreq_policy_data *policy)
 {
 	if (!policy)
 		return -EINVAL;
 
 	cpufreq_verify_within_cpu_limits(policy);
-
-	if((policy->policy != CPUFREQ_POLICY_POWERSAVE) &&
-	   (policy->policy != CPUFREQ_POLICY_PERFORMANCE))
-		return -EINVAL;
 
 	return 0;
 }
