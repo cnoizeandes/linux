@@ -186,7 +186,8 @@ void __init setup_bootmem(void)
 	max_pfn = PFN_DOWN(memblock_end_of_DRAM());
 	memblock_set_current_limit(__pa(LOWMEM_END));
 #else
-	max_low_pfn = PFN_DOWN(memblock_end_of_DRAM());
+	max_pfn = PFN_DOWN(memblock_end_of_DRAM());
+	max_low_pfn = max_pfn;
 #endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	setup_initrd();
