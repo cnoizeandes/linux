@@ -1,4 +1,3 @@
-#include <linux/irqflags.h>
 #include <linux/module.h>
 #include <linux/cpu.h>
 #include <linux/of.h>
@@ -7,6 +6,7 @@
 #include <linux/cacheinfo.h>
 #include <linux/sizes.h>
 #include <linux/smp.h>
+#include <linux/irqflags.h>
 #include <asm/csr.h>
 #include <asm/sbi.h>
 #include <asm/io.h>
