@@ -238,16 +238,6 @@ static int atc_rtc_probe(struct platform_device *pdev)
 	if (!rtc->res)
 		goto err_exit;
 
-	ret = request_irq(rtc->alarm_irq, rtc_alarm, 0,
-			  "RTC Alarm : atcrtc100", rtc);
-	if (ret)
-		goto err_exit;
-
-	ret = request_irq(rtc->interrupt_irq, rtc_interrupt,
-			  0, "RTC Interrupt : atcrtc100", rtc);
-	if (ret)
-		goto err_interrupt_irq;
-
 	ret = -EBUSY;
 
 	rtc->res = request_mem_region(rtc->res->start,
@@ -283,7 +273,6 @@ static int atc_rtc_probe(struct platform_device *pdev)
 		return -ENOENT;
 	}
 #endif
-	RTC_CR |= RTC_EN;
 	platform_set_drvdata(pdev, rtc);
 
 	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source"))
@@ -303,6 +292,18 @@ static int atc_rtc_probe(struct platform_device *pdev)
 	ret = rtc_register_device(rtc->rtc_dev);
 	if (ret)
 		goto err_unmap;
+
+	ret = request_irq(rtc->alarm_irq, rtc_alarm, 0,
+			  "RTC Alarm : atcrtc100", rtc);
+	if (ret)
+		goto err_exit;
+
+	ret = request_irq(rtc->interrupt_irq, rtc_interrupt,
+			  0, "RTC Interrupt : atcrtc100", rtc);
+	if (ret)
+		goto err_interrupt_irq;
+
+	RTC_CR |= RTC_EN;
 
 	return 0;
 
