@@ -16,7 +16,6 @@ struct pma_arg_t {
 	size_t entry_id;
 };
 
-
 enum sbi_ext_id {
 #ifdef CONFIG_RISCV_SBI_V01
 	SBI_EXT_0_1_SET_TIMER = 0x0,

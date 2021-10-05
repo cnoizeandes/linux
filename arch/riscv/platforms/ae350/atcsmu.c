@@ -51,26 +51,10 @@ void atcsmu100_set_suspend_mode(void)
 static int atcsmu100_restart_call(struct notifier_block *nb,
                                  unsigned long action, void *data)
 {
-       int cpu_num = num_online_cpus();
-#ifdef CONFIG_SMP
-       int id = smp_processor_id();
-       int i;
+	unsigned int cpu_num = num_possible_cpus();
 
-       for (i = 0; i < cpu_num; i++) {
-               int ret;
-               if (i == id)
-                       continue;
-               ret = smp_call_function_single(i, cpu_dcache_disable,
-                                               NULL, true);
-               if (ret)
-                       pr_err("Disable D-cache FAIL\n"
-                               "ERROR CODE:%d\n", ret);
-       }
-#endif
-       cpu_dcache_disable(NULL);
-       cpu_l2c_disable();
-       sbi_restart(cpu_num);
-       return 0;
+	sbi_restart(cpu_num);
+	return 0;
 }
 
 static struct notifier_block atcsmu100_restart = {
