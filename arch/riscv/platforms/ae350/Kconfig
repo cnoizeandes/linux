@@ -5,6 +5,8 @@ config ATCCPUFREQ
 	depends on CPU_FREQ
 config ATCDMAC300
 	def_bool y
+	select SND_FTSSP010
+	select MMC_FTSDC
 	depends on PLATFORM_AHBDMA
 
 endmenu
