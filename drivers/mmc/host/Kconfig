@@ -563,7 +563,7 @@ config MMC_FTSDC
 	  say Y or M here.  If unsure, say N.
 
 config MMC_FTSDCG
-	tristate "Andestech SDC Multimedia Card Interface support dmeengine"
+	tristate "Andestech SDC Multimedia Card Interface support dmaengine"
 	depends on RISCV
 	depends on ATCDMAC300G
 	help
