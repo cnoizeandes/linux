@@ -57,7 +57,7 @@
 #define IRQ_U_EXT		8
 #define IRQ_S_EXT		9
 #define IRQ_M_EXT		11
-#define IRQ_S_PMU		274
+#define IRQ_S_HPM		274
 
 #define EXC_INST_MISALIGNED	0
 #define EXC_INST_ACCESS		1

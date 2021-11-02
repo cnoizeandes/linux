@@ -17,9 +17,9 @@
  * There only have 2 base counters,
  * but there is a *time* register at counteren[1]
  */
-#ifdef CONFIG_RISCV_BASE_PMU
+#ifdef CONFIG_RISCV_BASE_HPM
 #define RISCV_MAX_COUNTERS	3
-#elif defined CONFIG_ANDES_PMU
+#elif defined CONFIG_ANDES_HPM
 #define RISCV_MAX_COUNTERS      7
 #endif
 
@@ -27,7 +27,7 @@
 #define BASE_COUNTERS	3
 
 #ifndef RISCV_MAX_COUNTERS
-#error "Please provide a valid RISCV_MAX_COUNTERS for the PMU."
+#error "Please provide a valid RISCV_MAX_COUNTERS for the HPM."
 #endif
 
 /*
@@ -42,12 +42,12 @@
  */
 #define RISCV_CYCLE_COUNTER	0
 #define RISCV_INSTRET_COUNTER	2
-#define RISCV_PMU_MHPMCOUNTER3	3
-#define RISCV_PMU_MHPMCOUNTER4	4
-#define RISCV_PMU_MHPMCOUNTER5	5
-#define RISCV_PMU_MHPMCOUNTER6	6
-#define RISCV_PMU_MHPMCOUNTER7	7
-#define RISCV_PMU_MHPMCOUNTER8	8
+#define RISCV_HPM_MHPMCOUNTER3	3
+#define RISCV_HPM_MHPMCOUNTER4	4
+#define RISCV_HPM_MHPMCOUNTER5	5
+#define RISCV_HPM_MHPMCOUNTER6	6
+#define RISCV_HPM_MHPMCOUNTER7	7
+#define RISCV_HPM_MHPMCOUNTER8	8
 
 #define RISCV_OP_UNSUPP		(-EOPNOTSUPP)
 
@@ -148,7 +148,7 @@ struct cpu_hw_events {
 
 	unsigned long           active_mask[BITS_TO_LONGS(RISCV_MAX_COUNTERS)];
 	unsigned long           used_mask[BITS_TO_LONGS(RISCV_MAX_COUNTERS)];
-	/* vendor-defined PMU data */
+	/* vendor-defined HPM data */
 	void			*platform;
 };
 
@@ -182,7 +182,7 @@ struct riscv_pmu {
 	/* the width of the counter */
 	int		counter_width;
 
-	/* vendor-defined PMU features */
+	/* vendor-defined HPM features */
 	void		*platform;
 
 	void		(*handle_irq)(struct pt_regs *regs);

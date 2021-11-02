@@ -54,7 +54,7 @@
 #define INST_COMMIT_NUM	23
 #define MEM_SYS_NUM	22
 #define MICROARCH_NUM	3
-
+#define HPM_FORMAT_ATTR(x,y) PMU_FORMAT_ATTR(x,#y)
 static const struct riscv_pmu *riscv_pmu __read_mostly;
 static DEFINE_PER_CPU(struct cpu_hw_events, cpu_hw_events);
 typedef void (*perf_irq_t)(struct pt_regs *);
@@ -270,7 +270,7 @@ static inline u64 read_counter(int idx)
                 val = csr_read(CSR_INSTRET);
 #endif
 		break;
-	case RISCV_PMU_MHPMCOUNTER3:
+	case RISCV_HPM_MHPMCOUNTER3:
 #if __riscv_xlen == 32
                 val |= csr_read(0xC03);
                 val |= ((u64)csr_read(0xC83) << 32);
@@ -278,7 +278,7 @@ static inline u64 read_counter(int idx)
                 val = csr_read(0xC03);
 #endif
 		break;
-	case RISCV_PMU_MHPMCOUNTER4:
+	case RISCV_HPM_MHPMCOUNTER4:
 #if __riscv_xlen == 32
                 val |= csr_read(0xC04);
                 val |= ((u64)csr_read(0xC84) << 32);
@@ -286,7 +286,7 @@ static inline u64 read_counter(int idx)
                 val = csr_read(0xC04);
 #endif
 		break;
-	case RISCV_PMU_MHPMCOUNTER5:
+	case RISCV_HPM_MHPMCOUNTER5:
 #if __riscv_xlen == 32
                 val |= csr_read(0xC05);
                 val |= ((u64)csr_read(0xC85) << 32);
@@ -294,7 +294,7 @@ static inline u64 read_counter(int idx)
                 val = csr_read(0xC05);
 #endif
 		break;
-	case RISCV_PMU_MHPMCOUNTER6:
+	case RISCV_HPM_MHPMCOUNTER6:
 #if __riscv_xlen == 32
                 val |= csr_read(0xC06);
                 val |= ((u64)csr_read(0xC86) << 32);
@@ -329,7 +329,7 @@ static inline void write_counter(int idx, u64 value)
                 csr_write(CSR_INSTRET, value);
 #endif
                 break;
-        case RISCV_PMU_MHPMCOUNTER3:
+        case RISCV_HPM_MHPMCOUNTER3:
 #if __riscv_xlen == 32
                 csr_write(0xC03, value);
                 csr_write(0xC83, value >> 32);
@@ -337,7 +337,7 @@ static inline void write_counter(int idx, u64 value)
                 csr_write(0xC03, value);
 #endif
                 break;
-        case RISCV_PMU_MHPMCOUNTER4:
+        case RISCV_HPM_MHPMCOUNTER4:
 #if __riscv_xlen == 32
                 csr_write(0xC04, value);
                 csr_write(0xC84, value >> 32);
@@ -345,7 +345,7 @@ static inline void write_counter(int idx, u64 value)
                 csr_write(0xC04, value);
 #endif
                 break;
-        case RISCV_PMU_MHPMCOUNTER5:
+        case RISCV_HPM_MHPMCOUNTER5:
 #if __riscv_xlen == 32
                 csr_write(0xC05, value);
                 csr_write(0xC85, value >> 32);
@@ -353,7 +353,7 @@ static inline void write_counter(int idx, u64 value)
                 csr_write(0xC05, value);
 #endif
                 break;
-        case RISCV_PMU_MHPMCOUNTER6:
+        case RISCV_HPM_MHPMCOUNTER6:
 #if __riscv_xlen == 32
                 csr_write(0xC06, value);
                 csr_write(0xC86, value >> 32);
@@ -518,16 +518,16 @@ static inline void riscv_pmu_event_enable(struct perf_event *event)
                 return;
 
         switch (idx) {
-                case RISCV_PMU_MHPMCOUNTER3:
+                case RISCV_HPM_MHPMCOUNTER3:
                         csr_write(CSR_SHPMEVENT3, ev_config);
                         break;
-                case RISCV_PMU_MHPMCOUNTER4:
+                case RISCV_HPM_MHPMCOUNTER4:
                         csr_write(CSR_SHPMEVENT4, ev_config);
                         break;
-                case RISCV_PMU_MHPMCOUNTER5:
+                case RISCV_HPM_MHPMCOUNTER5:
                         csr_write(CSR_SHPMEVENT5, ev_config);
                         break;
-                case RISCV_PMU_MHPMCOUNTER6:
+                case RISCV_HPM_MHPMCOUNTER6:
                         csr_write(CSR_SHPMEVENT6, ev_config);
                         break;
                 default:
@@ -681,7 +681,7 @@ finish_start:
 }
 
 /*
- * pmu->add: add the event to PMU.
+ * pmu->add: add the event to HPM.
  */
 static int riscv_pmu_add(struct perf_event *event, int flags)
 {
@@ -731,7 +731,7 @@ finish_add:
 }
 
 /*
- * pmu->del: delete the event from PMU.
+ * pmu->del: delete the event from HPM.
  */
 static void riscv_pmu_del(struct perf_event *event, int flags)
 {
@@ -928,7 +928,7 @@ static int riscv_event_init(struct perf_event *event)
 /*
  * Initialization
  */
-PMU_FORMAT_ATTR(event, "config:0-63");
+HPM_FORMAT_ATTR(event, "config:0-63");
 
 static struct attribute *riscv_arch_formats_attr[] = {
         &format_attr_event.attr,
@@ -965,9 +965,9 @@ static const struct attribute_group *riscv_pmu_attr_groups[] = {
 };
 
 static struct pmu min_pmu = {
-#ifdef CONFIG_ANDES_PMU
+#ifdef CONFIG_ANDES_HPM
 	.name		= "andes-base",
-#elif defined CONFIG_RISCV_BASE_PMU
+#elif defined CONFIG_RISCV_BASE_HPM
 	.name		= "riscv-base",
 #endif
 	.attr_groups    = riscv_pmu_attr_groups,
@@ -991,7 +991,7 @@ static const struct riscv_pmu riscv_base_pmu = {
 	.num_counters = RISCV_MAX_COUNTERS - 1,
 	.handle_irq = &riscv_base_pmu_handle_irq,
 	.max_period = 0xFFFFFFFF,
-	/* This means this PMU has no IRQ. */
+	/* This means this HPM has no IRQ. */
 	.irq = -1,
 };
 
@@ -1034,9 +1034,9 @@ int __init init_hw_perf_events(void)
 			riscv_pmu = of_id->data;
 		of_node_put(node);
 	}
-#ifdef CONFIG_ANDES_PMU
+#ifdef CONFIG_ANDES_HPM
 	perf_pmu_register(riscv_pmu->pmu, "andes-base", PERF_TYPE_RAW);
-#elif defined CONFIG_RISCV_BASE_PMU
+#elif defined CONFIG_RISCV_BASE_HPM
 	perf_pmu_register(riscv_pmu->pmu, "riscv-base", PERF_TYPE_RAW);
 #endif
 

@@ -287,21 +287,21 @@ config RISCV_ISA_A
 	def_bool y
 
 choice
-	prompt "supported PMU type"
+	prompt "supported HPM type"
 	depends on PERF_EVENTS
-	default RISCV_BASE_PMU
+	default RISCV_BASE_HPM
 
-config RISCV_BASE_PMU
-	bool "Base Performance Monitoring Unit"
+config RISCV_BASE_HPM
+	bool "Base Hardware Performance Monitor"
 	help
-	  A base PMU that serves as a reference implementation and has limited
+	  A base HPM that serves as a reference implementation and has limited
 	  feature of perf.  It can run on any RISC-V machines so serves as the
 	  fallback, but this option can also be disable to reduce kernel size.
 
-config ANDES_PMU
-	bool "ANDES Performance Monitoring Unit"
+config ANDES_HPM
+	bool "ANDES Hardware Performance Monitor"
 	help
-	  Andes PMU provide extension registers for Performance counter.
+	  Andes HPM provide extension registers for Performance counter.
 endchoice
 
 config DSP
