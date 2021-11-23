@@ -63,6 +63,11 @@ enum sbi_ext_rfence_fid {
 	SBI_EXT_RFENCE_REMOTE_HFENCE_GVMA_VMID,
 	SBI_EXT_RFENCE_REMOTE_HFENCE_VVMA,
 	SBI_EXT_RFENCE_REMOTE_HFENCE_VVMA_ASID,
+	SBI_EXT_RCACHE_INVAL_LINE,
+	SBI_EXT_RCACHE_INVAL_RANGE,
+	SBI_EXT_RCACHE_WB_LINE,
+	SBI_EXT_RCACHE_WB_RANGE,
+	SBI_EXT_RCACHE_WBINVAL_ALL,
 };
 
 enum sbi_ext_hsm_fid {
@@ -152,6 +157,15 @@ void sbi_shutdown(void);
 void sbi_clear_ipi(void);
 void sbi_send_ipi(const unsigned long *hart_mask);
 void sbi_remote_fence_i(const unsigned long *hart_mask);
+
+int sbi_remote_cache_inval_range(const unsigned long *hart_mask,
+			   unsigned long start,
+			   unsigned long size);
+
+int sbi_remote_cache_flush_range(const unsigned long *hart_mask,
+			   unsigned long start,
+			   unsigned long size);
+
 void sbi_remote_sfence_vma(const unsigned long *hart_mask,
 			   unsigned long start,
 			   unsigned long size);

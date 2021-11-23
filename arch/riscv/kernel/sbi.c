@@ -10,6 +10,7 @@
 #include <linux/reboot.h>
 #include <asm/sbi.h>
 #include <asm/smp.h>
+#include <asm/bitops.h>
 
 /* default SBI version is 0.1 */
 unsigned long sbi_spec_version = SBI_SPEC_VERSION_DEFAULT;
@@ -287,6 +288,18 @@ static int __sbi_rfence_v02_call(unsigned long fid, unsigned long hmask_val,
 		ret = sbi_ecall(ext, fid, hmask_val, hbase, start,
 				size, arg4, 0);
 		break;
+	case SBI_EXT_RCACHE_INVAL_LINE:
+		ret = sbi_ecall(ext, fid, hmask_val, hbase, start,
+				size, 0, arg5);
+		break;
+	case SBI_EXT_RCACHE_INVAL_RANGE:
+		ret = sbi_ecall(ext, fid, hmask_val, hbase, start,
+				size, 0, arg5);
+		break;
+	case SBI_EXT_RCACHE_WB_RANGE:
+		ret = sbi_ecall(ext, fid, hmask_val, hbase, start,
+				size, 0, arg5);
+		break;
 	default:
 		pr_err("unknown function ID [%lu] for SBI extension [%d]\n",
 		       fid, ext);
@@ -306,7 +319,7 @@ static int __sbi_rfence_v02(int fid, const unsigned long *hart_mask,
 			    unsigned long start, unsigned long size,
 			    unsigned long arg4, unsigned long arg5)
 {
-	unsigned long hmask_val, hartid, hbase;
+	unsigned long hmask_val, hartid, hbase, last_hartid;
 	struct cpumask tmask;
 	int result;
 
@@ -317,10 +330,11 @@ static int __sbi_rfence_v02(int fid, const unsigned long *hart_mask,
 
 	hmask_val = 0;
 	hbase = 0;
+	last_hartid = 0;
 	for_each_set_bit(hartid, hart_mask, NR_CPUS) {
 		if (hmask_val && ((hbase + BITS_PER_LONG) <= hartid)) {
 			result = __sbi_rfence_v02_call(fid, hmask_val, hbase,
-						       start, size, arg4, arg5);
+						       start, size, arg4, last_hartid);
 			if (result)
 				return result;
 			hmask_val = 0;
@@ -329,11 +343,12 @@ static int __sbi_rfence_v02(int fid, const unsigned long *hart_mask,
 		if (!hmask_val)
 			hbase = hartid;
 		hmask_val |= 1UL << (hartid - hbase);
+		last_hartid = hartid;
 	}
 
 	if (hmask_val) {
 		result = __sbi_rfence_v02_call(fid, hmask_val, hbase,
-					       start, size, arg4, arg5);
+					       start, size, arg4, last_hartid);
 		if (result)
 			return result;
 	}
@@ -519,6 +534,20 @@ static void sbi_srst_power_off(void)
 {
 	sbi_srst_reset(SBI_SRST_RESET_TYPE_SHUTDOWN,
 		       SBI_SRST_RESET_REASON_NONE);
+}
+
+int sbi_remote_cache_inval_range(const unsigned long *hart_mask,
+			   unsigned long start,
+			   unsigned long size)
+{
+	return  __sbi_rfence(SBI_EXT_RCACHE_INVAL_RANGE, hart_mask, start, size, 0, 0);
+}
+
+int sbi_remote_cache_flush_range(const unsigned long *hart_mask,
+			   unsigned long start,
+			   unsigned long size)
+{
+	return  __sbi_rfence(SBI_EXT_RCACHE_WB_RANGE, hart_mask, start, size, 0, 0);
 }
 
 /**

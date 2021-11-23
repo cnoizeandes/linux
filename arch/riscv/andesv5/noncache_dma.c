@@ -25,11 +25,14 @@
 #include <linux/scatterlist.h>
 #include <linux/highmem.h>
 #include <asm/andesv5/proc.h>
+#include <asm/sbi.h>
 
 static void dma_flush_page(struct page *page, size_t size)
 {
 	unsigned long k_d_vaddr;
 	struct range_info ri;
+	int ret = -1;
+
 	/*
 	 * Invalidate any data that might be lurking in the
 	 * kernel direct-mapped region for device DMA.
@@ -39,9 +42,19 @@ static void dma_flush_page(struct page *page, size_t size)
 	ri.start = k_d_vaddr;
 	ri.end = k_d_vaddr + size;
 	ri.page = page;
-	cpu_dma_wb_range((void *)&ri);
-	cpu_dma_inval_range((void *)&ri);
+#ifdef CONFIG_IPI_CACHE_OP
+	ret = sbi_remote_cache_flush_range(NULL, page_to_phys(page), size);
+#endif
+	if (ret)
+		cpu_dma_wb_range((void *)&ri);
+	ret = -1;
+#ifdef CONFIG_IPI_CACHE_OP
+	ret = sbi_remote_cache_inval_range(NULL, page_to_phys(page), size);
+#endif
+	if (ret)
+		cpu_dma_inval_range((void *)&ri);
 }
+
 
 static inline void cache_op(phys_addr_t paddr, size_t size,
 		void (*fn)(void *ri))
@@ -89,14 +102,24 @@ static inline void cache_op(phys_addr_t paddr, size_t size,
 void arch_sync_dma_for_device(struct device *dev, phys_addr_t paddr,
 		size_t size, enum dma_data_direction dir)
 {
+	int ret = -1;
+
 	switch (dir) {
 	case DMA_FROM_DEVICE:
     // Bug 18339
-    cache_op(paddr, size, cpu_dma_inval_range);
+#ifdef CONFIG_IPI_CACHE_OP
+		ret = sbi_remote_cache_inval_range(NULL, paddr, size);
+#endif
+		if (ret)
+			cache_op(paddr, size, cpu_dma_inval_range);
 		break;
 	case DMA_TO_DEVICE:
 	case DMA_BIDIRECTIONAL:
-		cache_op(paddr, size, cpu_dma_wb_range);
+#ifdef CONFIG_IPI_CACHE_OP
+		ret = sbi_remote_cache_flush_range(NULL, paddr, size);
+#endif
+		if (ret)
+			cache_op(paddr, size, cpu_dma_wb_range);
 		break;
 	default:
 		BUG();
@@ -106,13 +129,19 @@ void arch_sync_dma_for_device(struct device *dev, phys_addr_t paddr,
 void arch_sync_dma_for_cpu(struct device *dev, phys_addr_t paddr,
 		size_t size, enum dma_data_direction dir)
 {
+	int ret = -1;
+
 	switch (dir) {
 	case DMA_TO_DEVICE:
 		break;
 	case DMA_FROM_DEVICE:
 	case DMA_BIDIRECTIONAL:
     // for pre-fetch
-		cache_op(paddr, size, cpu_dma_inval_range);
+#ifdef CONFIG_IPI_CACHE_OP
+		ret = sbi_remote_cache_inval_range(NULL, paddr, size);
+#endif
+		if (ret)
+			cache_op(paddr, size, cpu_dma_inval_range);
 		break;
 	default:
 		BUG();
