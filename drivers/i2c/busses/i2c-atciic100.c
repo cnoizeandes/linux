@@ -24,6 +24,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 
+#include <linux/uaccess.h>
 
 #define SUPPORT_AT24C128_BY_BOARD	0
 
@@ -411,11 +412,10 @@ void __init ae300_add_device_i2c(struct i2c_board_info *devices, int nr_devices)
 /*
  * Main initialization routine.
  */
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
-	unsigned int shift_bits);
-
 static int atciic_probe(struct platform_device *pdev)
 {
+	int (*read_fixup)(void __iomem *addr, unsigned int val,
+		unsigned int shift_bits);
 	struct i2c_adapter *padap;
 	struct atciic *iface;
 	int rc, ret;
@@ -450,7 +450,9 @@ static int atciic_probe(struct platform_device *pdev)
 		goto out_error_get_io;
 	}
 	/* Check ID and Revision Register */
-	ret = readl_fixup(iface->regs_base, 0x020210, 8);
+	read_fixup = symbol_get(readl_fixup);
+	ret = read_fixup(iface->regs_base, 0x020210, 8);
+	symbol_put(readl_fixup);
 	if(!ret){
 		dev_err(&pdev->dev, "I2C version NOT match, bitmap not support atciic100\n");
 		rc = -ENXIO;

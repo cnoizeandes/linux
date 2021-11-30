@@ -35,6 +35,7 @@
 #include <linux/platform_device.h>
 
 #include "ftmac100.h"
+#include <linux/uaccess.h>
 
 #define DRV_NAME	"ftmac100"
 #define DRV_VERSION	"0.2"
@@ -1101,11 +1102,10 @@ static const struct net_device_ops ftmac100_netdev_ops = {
 /******************************************************************************
  * struct platform_driver functions
  *****************************************************************************/
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
-	unsigned int shift_bits);
-
 static int ftmac100_probe(struct platform_device *pdev)
 {
+	int (*read_fixup)(void __iomem *addr, unsigned int val,
+		unsigned int shift_bits);
 	struct resource *res;
 	int irq;
 	struct net_device *netdev;
@@ -1163,7 +1163,9 @@ static int ftmac100_probe(struct platform_device *pdev)
 	}
 
 	/*Check revision register*/
-	ret = readl_fixup(priv->base + FTMAC100_OFFSET_REVISION, 0x00010407, 0);
+	read_fixup = symbol_get(readl_fixup);
+	ret = read_fixup(priv->base + FTMAC100_OFFSET_REVISION, 0x00010407, 0);
+	symbol_put(readl_fixup);
 	if (!ret){
 		dev_err(&pdev->dev, "fail to read revision reg, bitmap not support ftmac100\n");
 		err = -EIO;

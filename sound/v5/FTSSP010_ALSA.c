@@ -21,6 +21,7 @@
 #include <asm/irq.h>
 #include <asm/io.h>
 #include "FTSSP010_UDA1345TS.h"
+#include <linux/uaccess.h>
 
 struct alc5630_data;
 int init_hw(unsigned int cardno,unsigned int ac97, struct i2c_client *client);
@@ -1425,11 +1426,11 @@ static int ftssp_alsa_i2c_i2s_exit(void)
 	return 0;
 }
 
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
-	unsigned int shift_bits);
 
 static int atf_ac97_probe(struct platform_device *pdev)
 {
+	int (*read_fixup)(void __iomem *addr, unsigned int val,
+		unsigned int shift_bits);
 	struct resource *r, *mem = NULL;
 	size_t mem_size;
 	int ret;
@@ -1441,7 +1442,9 @@ static int atf_ac97_probe(struct platform_device *pdev)
 	ssp2_vbase = (resource_size_t)(unsigned long)ioremap(mem->start, mem_size);
 
 	/* Check SSP revision register */
-	ret = readl_fixup((void __iomem *)(unsigned long)ssp2_vbase + 0x40,  0x00011506, 0);
+	read_fixup = symbol_get(readl_fixup);
+	ret = read_fixup((void __iomem *)(unsigned long)ssp2_vbase + 0x40,  0x00011506, 0);
+	symbol_put(readl_fixup);
 	if (!ret){
 		ERR("%s: fail to read revision reg, bitmap no support ftssp \n", __func__);
 		return -ENXIO;

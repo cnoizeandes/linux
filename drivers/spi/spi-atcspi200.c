@@ -23,6 +23,7 @@
 #include <linux/spi/spi.h>
 #include <linux/of.h>
 #include <linux/spinlock.h>
+#include <linux/uaccess.h>
 
 #define SPI_XFER_BEGIN		(1 << 0)
 #define SPI_XFER_END		(1 << 1)
@@ -316,10 +317,10 @@ static int atcspi200_spi_transfer_one_message(struct spi_master *master,struct s
 
 	return 0;
 }
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
-	unsigned int shift_bits);
 static int atcspi200_spi_probe(struct platform_device *pdev)
 {
+	int (*read_fixup)(void __iomem *addr, unsigned int val,
+		unsigned int shift_bits);
 	struct resource *res;
 	struct spi_master *master;
 	struct atcspi200_spi *spi;
@@ -346,7 +347,9 @@ static int atcspi200_spi_probe(struct platform_device *pdev)
 	}
 
 	/* check ID and Revision register */
-	ret = readl_fixup(spi->regs, 0x020020, 8);
+	read_fixup = symbol_get(readl_fixup);
+	ret = read_fixup(spi->regs, 0x020020, 8);
+	symbol_put(readl_fixup);
 	if (!ret){
 		dev_err(&pdev->dev, "Fail to read ID and Revision register, bitmap not support spi200\n");
 		goto put_master;

@@ -6,6 +6,7 @@
 #include <linux/of_platform.h>
 #include <linux/of_gpio.h>
 #include <linux/err.h>
+#include <linux/uaccess.h>
 
 #define GPIO_DATA_OUT			0x24
 #define GPIO_DATA_IN			0x20
@@ -196,11 +197,10 @@ static void gpio_irq_router(struct irq_desc *desc)
 	desc->irq_data.chip->irq_eoi(&desc->irq_data);
 }
 
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
-	unsigned int shift_bits);
-
 static int atcgpio100_gpio_probe(struct platform_device *pdev)
 {
+	int (*read_fixup)(void __iomem *addr, unsigned int val,
+		unsigned int shift_bits);
 	struct resource *res, *irq_res;
 	int ret, err;
 	struct atcgpio_priv *priv;
@@ -233,7 +233,9 @@ static int atcgpio100_gpio_probe(struct platform_device *pdev)
 		return PTR_ERR((void *)priv->base);
 
 	/* Check ID register */
-	ret = readl_fixup(priv->base, 0x020310, 8);
+	read_fixup = symbol_get(readl_fixup);
+	ret = read_fixup(priv->base, 0x020310, 8);
+	symbol_put(readl_fixup);
 	if (!ret){
 		dev_err(&pdev->dev, "failed read ID register,bitmap not support gpio100\n");
 		return -ENXIO;

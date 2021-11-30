@@ -266,9 +266,9 @@ static const struct of_device_id atcwdt200_dog_match[] = {
 MODULE_DEVICE_TABLE(of, atcwdt200_dog_match);
 #endif
 
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
-	unsigned int shift_bits);
 static int atcwdt200_dog_probe(struct platform_device *pdev){
+	int (*read_fixup)(void __iomem *addr, unsigned int val,
+		unsigned int shift_bits);
 	int ret;
 	struct resource *res;
 	struct device_node *node;
@@ -279,7 +279,9 @@ static int atcwdt200_dog_probe(struct platform_device *pdev){
 		return PTR_ERR(wdt_base);
 
 	/* check ID and Revision register */
-	ret = readl_fixup(wdt_base, 0x03002, 12);
+	read_fixup = symbol_get(readl_fixup);
+	ret = read_fixup(wdt_base, 0x03002, 12);
+	symbol_put(readl_fixup);
 	if (!ret){
 		dev_err(&pdev->dev, "fail to read ID and Revision reg, bitmap not support atcwdt200.\n");
 		return -ENOENT;

@@ -28,6 +28,7 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/of.h>
+#include <linux/uaccess.h>
 
 #define DRV_NAME		"atcrtc100"
 #define RTC_REG(off)		\
@@ -217,10 +218,10 @@ const static struct rtc_class_ops rtc_ops = {
 	.set_alarm	= atc_rtc_set_alarm,
 };
 
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
-	unsigned int shift_bits);
 static int atc_rtc_probe(struct platform_device *pdev)
 {
+	int (*read_fixup)(void __iomem *addr, unsigned int val,
+		unsigned int shift_bits);
 	struct atc_rtc *rtc = &rtc_platform_data;
 	int ret = -ENOENT;
 
@@ -254,7 +255,9 @@ static int atc_rtc_probe(struct platform_device *pdev)
 		goto err_ioremap1;
 
 	/* Check ID and Revision register 0x030110*/
-	ret = readl_fixup(rtc->regbase, 0x030110, 8);
+	read_fixup = symbol_get(readl_fixup);
+	ret = read_fixup(rtc->regbase, 0x030110, 8);
+	symbol_put(readl_fixup);
 	if (!ret){
 		dev_err(&pdev->dev, "failed read ID register, bitmap not support atcrtc100\n");
 		return -ENOENT;

@@ -1363,11 +1363,10 @@ nodata:
 	return pdata;
 }
 
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
-	unsigned int shift_bits);
-
 static int __init ftsdc_probe(struct platform_device *pdev)
 {
+	int (*read_fixup)(void __iomem *addr, unsigned int val,
+		unsigned int shift_bits);
 	struct ftsdc_host *host;
 	struct mmc_host	*mmc;
 	struct ftsdc_mmc_config *pdata = NULL;
@@ -1427,7 +1426,9 @@ static int __init ftsdc_probe(struct platform_device *pdev)
 	}
 
 	/* Check revision register */
-	ret = readl_fixup(host->base + SDC_REVISION_REG, 0x00030107, 0);
+	read_fixup = symbol_get(readl_fixup);
+	ret = read_fixup(host->base + SDC_REVISION_REG, 0x00030107, 0);
+	symbol_put(readl_fixup);
 	if (!ret){
 		dev_err(&pdev->dev, "failed to read revision reg, bitmap not support ftdsdc\n");
 		goto probe_free_mem_region;
