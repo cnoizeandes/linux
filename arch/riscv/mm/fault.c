@@ -11,6 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 #include <linux/perf_event.h>
+#include <linux/random.h>
 #include <linux/signal.h>
 #include <linux/uaccess.h>
 
@@ -37,6 +38,12 @@ asmlinkage void do_page_fault(struct pt_regs *regs)
 	cause = regs->scause;
 	addr = regs->sbadaddr;
 
+    /*
+     * For details, Please refer to Bugzilla #24142.
+     */
+    if (cause == EXC_INST_PAGE_FAULT && regs->sbadaddr == 0x10500073) {
+        addr = get_random_int() % 2 ? (regs->sepc + 0x2) : regs->sepc;
+    }
 	tsk = current;
 	mm = tsk->mm;
 
