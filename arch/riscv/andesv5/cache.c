@@ -22,6 +22,10 @@
 #define SEL_OFF(id)	(8 * (id % 8))
 
 void __iomem *l2c_base;
+/* default to offset of V0 memory map */
+u32 L2C_REG_PER_CORE_OFFSET = 0x10;
+u32 CCTL_L2_STATUS_PER_CORE_OFFSET = 0x4;
+u32 L2C_REG_STATUS_OFFSET = 0;
 
 DEFINE_PER_CPU(struct andesv5_cache_info, cpu_cache_info) = {
 	.init_done = 0,
@@ -58,7 +62,9 @@ inline int get_cache_line_size(void)
 
 static uint32_t cpu_l2c_get_cctl_status(void)
 {
-	return readl((void*)(l2c_base + L2C_REG_STATUS_OFFSET));
+	int mhartid = get_cpu();
+	put_cpu();
+	return readl((void*)(l2c_base + L2C_REG_C0_STATUS_OFFSET + mhartid * L2C_REG_STATUS_OFFSET));
 }
 
 void cpu_dcache_wb_range(unsigned long start, unsigned long end, int line_size, struct page *page)
@@ -524,8 +530,18 @@ void l2c_pmu_event_enable(u64 config, int idx)
 int __init l2c_init(void)
 {
 	struct device_node *node ;
+	int *memory_map;
 
 	node = of_find_compatible_node(NULL, NULL, "cache");
+
+	memory_map = of_get_property(node, "mmap", NULL);
+
+	if (memory_map && *memory_map == 0x1) {
+		L2C_REG_PER_CORE_OFFSET = 0x1000;
+		CCTL_L2_STATUS_PER_CORE_OFFSET = 0;
+		L2C_REG_STATUS_OFFSET = 0x1000;
+	}
+
 	l2c_base = of_iomap(node, 0);
 
 	return 0;
