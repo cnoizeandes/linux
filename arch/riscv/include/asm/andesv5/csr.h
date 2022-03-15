@@ -1,3 +1,4 @@
+#include <linux/types.h>
 /* mdcm_cfg: Data Cache/Memory Configuration Register */
 #define MDCM_CFG_DEST_OFFSET		0
 #define MDCM_CFG_DWAY_OFFSET		3
@@ -75,7 +76,7 @@
 #define L2C_REG_C2_ACC_OFFSET	0x68
 #define L2C_REG_C3_CMD_OFFSET	0x70
 #define L2C_REG_C3_ACC_OFFSET	0x78
-#define L2C_REG_STATUS_OFFSET	0x80
+#define L2C_REG_C0_STATUS_OFFSET	0x80
 #define L2C_REG_C0_HPM_OFFSET	0x200
 
 /* L2 CCTL status */
@@ -95,8 +96,10 @@
 #define CCTL_L2_WBINVAL_ALL	0x12
 
 #define L2C_HPM_PER_CORE_OFFSET		0x8
-#define L2C_REG_PER_CORE_OFFSET		0x10
-#define CCTL_L2_STATUS_PER_CORE_OFFSET	4
+#ifndef __ASSEMBLER__
+extern u32 L2C_REG_PER_CORE_OFFSET;
+extern u32 CCTL_L2_STATUS_PER_CORE_OFFSET;
+#endif
 #define L2C_REG_CN_CMD_OFFSET(n)	\
 	L2C_REG_C0_CMD_OFFSET + (n * L2C_REG_PER_CORE_OFFSET)
 #define L2C_REG_CN_ACC_OFFSET(n)	\
