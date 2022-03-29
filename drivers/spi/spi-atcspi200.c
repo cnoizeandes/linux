@@ -214,6 +214,7 @@ static int atcspi200_spi_transfer(struct spi_device *atcspi200_spi, struct spi_t
         max_trans_len = spi->max_transfer_length;
 	switch (flags) {
 	case SPI_XFER_SHIFT:
+		memcpy(cmd_buf+spi->cmd_len, t->tx_buf, t->len);
 		spi->cmd_len += t->len;
 		return 0;
 	case SPI_XFER_BEGIN:
