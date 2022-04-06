@@ -1431,6 +1431,7 @@ static int __init ftsdc_probe(struct platform_device *pdev)
 	symbol_put(readl_fixup);
 	if (!ret){
 		dev_err(&pdev->dev, "failed to read revision reg, bitmap not support ftdsdc\n");
+		ret = -ENXIO;
 		goto probe_free_mem_region;
 	}
 

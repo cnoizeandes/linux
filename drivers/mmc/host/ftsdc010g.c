@@ -1417,6 +1417,7 @@ static int __init ftsdc_probe(struct platform_device *pdev)
 	if (!ret) {
 		dev_err(&pdev->dev,
 			"bitmap revision mismatch(ftsdc)\n");
+		ret = -ENXIO;
 		goto probe_free_mem_region;
 	}
 
