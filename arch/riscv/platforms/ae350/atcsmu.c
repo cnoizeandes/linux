@@ -48,20 +48,6 @@ void atcsmu100_set_suspend_mode(void)
 }
 #endif
 
-static int atcsmu100_restart_call(struct notifier_block *nb,
-                                 unsigned long action, void *data)
-{
-	unsigned int cpu_num = num_possible_cpus();
-
-	sbi_andes_restart(cpu_num);
-	return 0;
-}
-
-static struct notifier_block atcsmu100_restart = {
-       .notifier_call = atcsmu100_restart_call,
-       .priority = 128,
-};
-
 static int atcsmu_probe(struct platform_device *pdev)
 {
 	struct atc_smu *smu = &atcsmu;
@@ -91,8 +77,6 @@ static int atcsmu_probe(struct platform_device *pdev)
 
 	for (pcs = 0; pcs < MAX_PCS_SLOT; pcs++)
 		writel(0xffdfffff, (void *)(smu->base + PCSN_WE_OFF(pcs)));
-
-	register_restart_handler(&atcsmu100_restart);
 
 	return 0;
 err_ioremap:
