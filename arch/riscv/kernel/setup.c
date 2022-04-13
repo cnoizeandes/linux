@@ -96,7 +96,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 #ifdef CONFIG_PMA
-	if (sbi_probe_pma()) {
+	if (sbi_andes_probe_pma()) {
 		pa_msb = 0;
 	}
 #endif

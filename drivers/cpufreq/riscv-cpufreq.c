@@ -19,14 +19,14 @@ void read_powerbrake(void *arg)
 {
 	int *ret = arg;
 
-	*ret = sbi_read_powerbrake();
+	*ret = sbi_andes_read_powerbrake();
 }
 
 void write_powerbrake(void *arg)
 {
 	int *val = arg;
 
-	sbi_write_powerbrake(*val);
+	sbi_andes_write_powerbrake(*val);
 }
 
 static unsigned int riscv_cpufreq_get(unsigned int cpu)

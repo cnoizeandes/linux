@@ -122,7 +122,7 @@ int wdt_get_timeout(void)
 static int wdtdog_open(struct inode *inode, struct file *file){
 	int val = num_online_cpus();
 
-	sbi_set_reset_vec(val);
+	sbi_andes_set_reset_vec(val);
 	wdt_start();
 	DEBUG("Activating WDT..\n");
 	return 0;

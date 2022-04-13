@@ -1,28 +1,28 @@
 #include <asm/io.h>
 #include <asm/page.h>
 
-long cpu_l1c_status(void);
-void cpu_icache_enable(void *info);
-void cpu_icache_disable(void *info);
-void cpu_dcache_enable(void *info);
-void cpu_dcache_disable(void *info);
+long sbi_andes_cpu_l1c_status(void);
+void sbi_andes_cpu_icache_enable(void *info);
+void sbi_andes_cpu_icache_disable(void *info);
+void sbi_andes_cpu_dcache_enable(void *info);
+void sbi_andes_cpu_dcache_disable(void *info);
 uint32_t cpu_l2c_ctl_status(void);
 void cpu_l2c_disable(void);
 
-long get_non_blocking_status(void);
-long get_write_around_status(void);
-void sbi_enable_non_blocking_load_store(void);
-void sbi_disable_non_blocking_load_store(void);
-void sbi_enable_write_around(void);
-void sbi_disable_write_around(void);
+long sbi_andes_get_non_blocking_status(void);
+long sbi_andes_get_write_around_status(void);
+void sbi_andes_enable_non_blocking_load_store(void);
+void sbi_andes_disable_non_blocking_load_store(void);
+void sbi_andes_enable_write_around(void);
+void sbi_andes_disable_write_around(void);
 
-void sbi_enable_l1i_cache(void);
-void sbi_disable_l1i_cache(void);
-void sbi_enable_l1d_cache(void);
-void sbi_disable_l1d_cache(void);
+void sbi_andes_enable_l1i_cache(void);
+void sbi_andes_disable_l1i_cache(void);
+void sbi_andes_enable_l1d_cache(void);
+void sbi_andes_disable_l1d_cache(void);
 
-void sbi_set_mcache_ctl(unsigned long input);
-void sbi_set_mmisc_ctl(unsigned long input);
+void sbi_andes_set_mcache_ctl(unsigned long input);
+void sbi_andes_set_mmisc_ctl(unsigned long input);
 
 void cpu_dma_inval_range(void *info);
 void cpu_dma_wb_range(void *info);

@@ -25,25 +25,25 @@ EXPORT_SYMBOL(atcsmu);
 extern int num_cpus;
 void andes_suspend2ram(void)
 {
-	sbi_enter_suspend_mode(DeepSleepMode, true, *wake_mask, num_cpus);
+	sbi_andes_enter_suspend_mode(DeepSleepMode, true, *wake_mask, num_cpus);
 }
 
 
 // main hart
 void andes_suspend2standby(void)
 {
-	sbi_enter_suspend_mode(LightSleepMode, true, *wake_mask, num_cpus);
+	sbi_andes_enter_suspend_mode(LightSleepMode, true, *wake_mask, num_cpus);
 }
 
 // other harts
 void atcsmu100_set_suspend_mode(void)
 {
 	if (suspend_begin == PM_SUSPEND_MEM) {
-		sbi_set_suspend_mode(DeepSleepMode);
+		sbi_andes_set_suspend_mode(DeepSleepMode);
 	} else if (suspend_begin == PM_SUSPEND_STANDBY) {
-		sbi_set_suspend_mode(LightSleepMode);
+		sbi_andes_set_suspend_mode(LightSleepMode);
 	} else {
-		sbi_set_suspend_mode(CpuHotplugDeepSleepMode);
+		sbi_andes_set_suspend_mode(CpuHotplugDeepSleepMode);
 	}
 }
 #endif
@@ -53,7 +53,7 @@ static int atcsmu100_restart_call(struct notifier_block *nb,
 {
 	unsigned int cpu_num = num_possible_cpus();
 
-	sbi_restart(cpu_num);
+	sbi_andes_restart(cpu_num);
 	return 0;
 }
 

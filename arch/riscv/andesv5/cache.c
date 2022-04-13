@@ -163,14 +163,14 @@ void cpu_dma_wb_range(void *info)
 EXPORT_SYMBOL(cpu_dma_wb_range);
 
 /*non-blocking load store*/
-long get_non_blocking_status(void)
+long sbi_andes_get_non_blocking_status(void)
 {
 	struct sbiret ret;
 
 	ret = sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_GET_MMISC_CTL_STATUS, 0, 0, 0, 0, 0, 0);
 	return ret.value;
 }
-void sbi_set_mcache_ctl(unsigned long input)
+void sbi_andes_set_mcache_ctl(unsigned long input)
 {
 	unsigned long flags;
 
@@ -178,9 +178,8 @@ void sbi_set_mcache_ctl(unsigned long input)
 	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_MCACHE_CTL, input, 0, 0, 0, 0, 0);
 	local_irq_restore(flags);
 }
-EXPORT_SYMBOL(sbi_set_mcache_ctl);
 
-void sbi_set_mmisc_ctl(unsigned long input)
+void sbi_andes_set_mmisc_ctl(unsigned long input)
 {
        unsigned long flags;
 
@@ -188,10 +187,9 @@ void sbi_set_mmisc_ctl(unsigned long input)
        sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_NON_BLOCKING_LOAD_STORE, input, 0, 0, 0, 0, 0);
        local_irq_restore(flags);
 }
-EXPORT_SYMBOL(sbi_set_mmisc_ctl);
 
 /*write around*/
-long get_write_around_status(void)
+long sbi_andes_get_write_around_status(void)
 {
 	struct sbiret ret;
 	ret = sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_GET_MCACHE_CTL_STATUS, 0, 0, 0, 0, 0, 0);
@@ -199,7 +197,7 @@ long get_write_around_status(void)
 }
 
 
-void sbi_enable_non_blocking_load_store(void)
+void sbi_andes_enable_non_blocking_load_store(void)
 {
        unsigned long flags;
 
@@ -208,7 +206,7 @@ void sbi_enable_non_blocking_load_store(void)
        local_irq_restore(flags);
 }
 
-void sbi_disable_non_blocking_load_store(void)
+void sbi_andes_disable_non_blocking_load_store(void)
 {
        unsigned long flags;
 
@@ -217,7 +215,7 @@ void sbi_disable_non_blocking_load_store(void)
        local_irq_restore(flags);
 }
 
-void sbi_enable_write_around(void)
+void sbi_andes_enable_write_around(void)
 {
 	unsigned long flags;
 
@@ -226,7 +224,7 @@ void sbi_enable_write_around(void)
        local_irq_restore(flags);
 }
 
-void sbi_disable_write_around(void)
+void sbi_andes_disable_write_around(void)
 {
        unsigned long flags;
 
@@ -236,7 +234,7 @@ void sbi_disable_write_around(void)
 }
 /* L1 Cache Prefetch */
 
-void sbi_enable_l1i_cache(void)
+void sbi_andes_enable_l1i_cache(void)
 {
 	unsigned long flags;
 
@@ -245,7 +243,7 @@ void sbi_enable_l1i_cache(void)
         local_irq_restore(flags);
 }
 
-void sbi_disable_l1i_cache(void)
+void sbi_andes_disable_l1i_cache(void)
 {
 	unsigned long flags;
 
@@ -254,7 +252,7 @@ void sbi_disable_l1i_cache(void)
         local_irq_restore(flags);
 }
 
-void sbi_enable_l1d_cache(void)
+void sbi_andes_enable_l1d_cache(void)
 {
 	unsigned long flags;
 
@@ -263,7 +261,7 @@ void sbi_enable_l1d_cache(void)
         local_irq_restore(flags);
 }
 
-void sbi_disable_l1d_cache(void)
+void sbi_andes_disable_l1d_cache(void)
 {
         unsigned long flags;
 
@@ -272,14 +270,14 @@ void sbi_disable_l1d_cache(void)
         local_irq_restore(flags);
 }
 /* L1 Cache */
-long cpu_l1c_status(void)
+long sbi_andes_cpu_l1c_status(void)
 {
 	struct sbiret ret;
 	ret = sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_GET_MCACHE_CTL_STATUS, 0, 0, 0, 0, 0, 0);
 	return ret.value;
 }
 
-void cpu_icache_enable(void *info)
+void sbi_andes_cpu_icache_enable(void *info)
 {
 	unsigned long flags;
 
@@ -288,7 +286,7 @@ void cpu_icache_enable(void *info)
 	local_irq_restore(flags);
 }
 
-void cpu_icache_disable(void *info)
+void sbi_andes_cpu_icache_disable(void *info)
 {
 	unsigned long flags;
 
@@ -297,7 +295,7 @@ void cpu_icache_disable(void *info)
 	local_irq_restore(flags);
 }
 
-void cpu_dcache_enable(void *info)
+void sbi_andes_cpu_dcache_enable(void *info)
 {
 	unsigned long flags;
 
@@ -306,7 +304,7 @@ void cpu_dcache_enable(void *info)
 	local_irq_restore(flags);
 }
 
-void cpu_dcache_disable(void *info)
+void sbi_andes_cpu_dcache_disable(void *info)
 {
 	unsigned long flags;
 

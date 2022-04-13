@@ -46,13 +46,13 @@ void cpu_icache_smp_enable(void)
     for(i = 0; i < cpu_num; i++){
 		if(i == id)
 			continue;
-        ret = smp_call_function_single(i, cpu_icache_enable,
+        ret = smp_call_function_single(i, sbi_andes_cpu_icache_enable,
                                         NULL, true);
         if(ret)
             pr_err("Core %d enable I-cache Fail\n"
                     "Error Code:%d \n", i, ret);
     }
-    cpu_icache_enable(NULL);
+    sbi_andes_cpu_icache_enable(NULL);
 }
 
 void cpu_icache_smp_disable(void)
@@ -64,13 +64,13 @@ void cpu_icache_smp_disable(void)
     for(i = 0; i < cpu_num; i++){
         if(i == id)
             continue;
-        ret = smp_call_function_single(i, cpu_icache_disable,
+        ret = smp_call_function_single(i, sbi_andes_cpu_icache_disable,
                                         NULL, true);
         if(ret)
             pr_err("Core %d disable I-cache Fail \n"
                     "Error Code:%d \n", i, ret);
     }
-    cpu_icache_disable(NULL);
+    sbi_andes_cpu_icache_disable(NULL);
 }
 
 void cpu_dcache_smp_enable(void)
@@ -82,13 +82,13 @@ void cpu_dcache_smp_enable(void)
     for(i = 0; i < cpu_num; i++){
         if(i == id)
             continue;
-        ret = smp_call_function_single(i, cpu_dcache_enable,
+        ret = smp_call_function_single(i, sbi_andes_cpu_dcache_enable,
                                         NULL, true);
         if(ret)
             pr_err("Core %d disable D-cache Fail \n"
                     "Error Code:%d \n", i, ret);
     }
-    cpu_dcache_enable(NULL);
+    sbi_andes_cpu_dcache_enable(NULL);
 }
 
 void cpu_dcache_smp_disable(void)
@@ -100,13 +100,13 @@ void cpu_dcache_smp_disable(void)
     for(i = 0; i < cpu_num; i++){
         if(i == id)
             continue;
-        ret = smp_call_function_single(i, cpu_dcache_disable,
+        ret = smp_call_function_single(i, sbi_andes_cpu_dcache_disable,
                                         NULL, true);
         if(ret)
             pr_err("Core %d disable D-cache Fail \n"
                     "Error Code:%d \n", i, ret);
     }
-    cpu_dcache_disable(NULL);
+    sbi_andes_cpu_dcache_disable(NULL);
 }
 
 static ssize_t proc_read_cache_en(struct file *file, char __user *userbuf,
@@ -115,9 +115,9 @@ static ssize_t proc_read_cache_en(struct file *file, char __user *userbuf,
     int ret;
     char buf[18];
     if (!strncmp(file->f_path.dentry->d_name.name, "ic_en", 7))
-        ret = sprintf(buf, "I-cache: %s\n", (cpu_l1c_status() & CACHE_CTL_mskIC_EN) ? "Enabled" : "Disabled");
+        ret = sprintf(buf, "I-cache: %s\n", (sbi_andes_cpu_l1c_status() & CACHE_CTL_mskIC_EN) ? "Enabled" : "Disabled");
     else if(!strncmp(file->f_path.dentry->d_name.name, "dc_en", 7))
-        ret = sprintf(buf, "D-cache: %s\n", (cpu_l1c_status() & CACHE_CTL_mskDC_EN) ? "Enabled" : "Disabled");
+        ret = sprintf(buf, "D-cache: %s\n", (sbi_andes_cpu_l1c_status() & CACHE_CTL_mskDC_EN) ? "Enabled" : "Disabled");
 	else
 		return -EFAULT;
 
@@ -143,34 +143,34 @@ static ssize_t proc_write_cache_en(struct file *file,
 		return -EFAULT;
 
 	if (!strncmp(file->f_path.dentry->d_name.name, "ic_en", 7)) {
-		if (en && !(cpu_l1c_status() & CACHE_CTL_mskIC_EN)) {
+		if (en && !(sbi_andes_cpu_l1c_status() & CACHE_CTL_mskIC_EN)) {
 #ifdef CONFIG_SMP
 			cpu_icache_smp_enable();
 #else
-			cpu_icache_enable(NULL);
+			sbi_andes_cpu_icache_enable(NULL);
 #endif
 			DEBUG(debug, 1, "I-cache: Enabled\n");
-		} else if (!en && (cpu_l1c_status() & CACHE_CTL_mskIC_EN)) {
+		} else if (!en && (sbi_andes_cpu_l1c_status() & CACHE_CTL_mskIC_EN)) {
 #ifdef CONFIG_SMP
 			cpu_icache_smp_disable();
 #else
-			cpu_icache_disable(NULL);
+			sbi_andes_cpu_icache_disable(NULL);
 #endif
 			DEBUG(debug, 1, "I-cache: Disabled\n");
 		}
 	} else if(!strncmp(file->f_path.dentry->d_name.name, "dc_en", 7)) {
-		if (en && !(cpu_l1c_status() & CACHE_CTL_mskDC_EN)) {
+		if (en && !(sbi_andes_cpu_l1c_status() & CACHE_CTL_mskDC_EN)) {
 #ifdef CONFIG_SMP
 			cpu_dcache_smp_enable();
 #else
-			cpu_dcache_enable(NULL);
+			sbi_andes_cpu_dcache_enable(NULL);
 #endif
 			DEBUG(debug, 1, "D-cache: Enabled\n");
-		} else if (!en && (cpu_l1c_status() & CACHE_CTL_mskDC_EN)) {
+		} else if (!en && (sbi_andes_cpu_l1c_status() & CACHE_CTL_mskDC_EN)) {
 #ifdef CONFIG_SMP
 			cpu_dcache_smp_disable();
 #else
-			cpu_dcache_disable(NULL);
+			sbi_andes_cpu_dcache_disable(NULL);
 #endif
 			DEBUG(debug, 1, "D-cache: Disabled\n");
 		}

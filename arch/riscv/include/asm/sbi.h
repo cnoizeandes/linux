@@ -159,7 +159,6 @@ int sbi_remote_hfence_vvma_asid(const unsigned long *hart_mask,
 				unsigned long size,
 				unsigned long asid);
 int sbi_probe_extension(int ext);
-void sbi_set_trigger(unsigned int type, uintptr_t data, int enable);
 
 /* Check if current SBI specification version is 0.1 or not */
 static inline int sbi_spec_is_0_1(void)
@@ -182,17 +181,18 @@ static inline unsigned long sbi_minor_version(void)
 
 int sbi_err_map_linux_errno(int err);
 
-void sbi_suspend_prepare(char main_core, char enable);
-void sbi_suspend_mem(void);
-void sbi_restart(int cpu_num);
-void sbi_set_suspend_mode(int suspend_mode);
-void sbi_enter_suspend_mode(int suspend_mode, int main_core, unsigned int wake_mask, int num_cpus);
-void sbi_set_reset_vec(int val);
-void sbi_set_pma(void *arg);
-void sbi_free_pma(unsigned long vaddr);
-long sbi_probe_pma(void);
-void sbi_write_powerbrake(int val);
-int sbi_read_powerbrake(void);
+void sbi_andes_suspend_prepare(char main_core, char enable);
+void sbi_andes_suspend_mem(void);
+void sbi_andes_restart(int cpu_num);
+void sbi_andes_write_powerbrake(int val);
+int sbi_andes_read_powerbrake(void);
+void sbi_andes_set_suspend_mode(int suspend_mode);
+void sbi_andes_enter_suspend_mode(int suspend_mode, int main_core, unsigned int wake_mask, int num_cpus);
+void sbi_andes_set_reset_vec(int val);
+void sbi_andes_set_pma(void *arg);
+void sbi_andes_free_pma(unsigned long vaddr);
+long sbi_andes_probe_pma(void);
+void sbi_andes_set_trigger(unsigned int type, uintptr_t data, int enable);
 
 #else /* CONFIG_RISCV_SBI */
 /* stubs for code that is only reachable under IS_ENABLED(CONFIG_RISCV_SBI): */

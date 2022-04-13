@@ -91,7 +91,7 @@ void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
 	ret =  __ioremap_caller(offset, size, pgprot,
 		__builtin_return_address(0));
 #ifdef CONFIG_PMA
-	if(!pa_msb){	// PMA enable --> pa_msb==0 --> sbi_set_pma()
+	if(!pa_msb){	// PMA enable --> pa_msb==0 --> sbi_andes_set_pma()
 		/* Start to setting PMA */
 		/* Check whether the value of size is power of 2 */
 		if ((size & (size-1)) != 0) {
@@ -117,14 +117,14 @@ void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
 		for (i = 0; i < cpu_num; i++) {
 			if(i == id)
 				continue;
-			int err = smp_call_function_single(i, sbi_set_pma, 
+			int err = smp_call_function_single(i, sbi_andes_set_pma,
 				(void*)&pma_arg, true);
 			if(err){
 				pr_err("Core %d fails to set pma\n"
 				"Error Code: %d \n", i, err);
 			}
 		}
-		sbi_set_pma(&pma_arg);
+		sbi_andes_set_pma(&pma_arg);
 	}
 #endif
 	return ret;
@@ -148,7 +148,7 @@ void iounmap(volatile void __iomem *addr)
 		for (i = 0; i < MAX_PMA; i++) {
 			if (pma_used[i] == (unsigned long)addr) {
 				pma_used[i] = 0;
-				sbi_free_pma((unsigned long)i);
+				sbi_andes_free_pma((unsigned long)i);
 				break;
 			}
 		}

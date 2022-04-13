@@ -45,17 +45,17 @@ static ssize_t proc_read_sbi_en(struct file *file, char __user *userbuf,
     int ret;
     char buf[18];
     if (!strncmp(file->f_path.dentry->d_name.name, "non_blocking", 12)) {
-        ret = sprintf(buf, "non-blocking: %s\n", (get_non_blocking_status() & MMISC_CTL_NON_BLOCKING_ENABLE) ? "Enabled" : "Disabled");
+        ret = sprintf(buf, "non-blocking: %s\n", (sbi_andes_get_non_blocking_status() & MMISC_CTL_NON_BLOCKING_ENABLE) ? "Enabled" : "Disabled");
     } else if (!strncmp(file->f_path.dentry->d_name.name, "write_around", 12)) {
-        ret = sprintf(buf, "write_around: %s\n", (get_write_around_status() & MCACHE_CTL_DC_WAROUND_1_EN) ? "Enabled" : "Disabled");
+        ret = sprintf(buf, "write_around: %s\n", (sbi_andes_get_write_around_status() & MCACHE_CTL_DC_WAROUND_1_EN) ? "Enabled" : "Disabled");
     } else if (!strncmp(file->f_path.dentry->d_name.name, "l1i_prefetch", 12)) {
-        ret = sprintf(buf, "l1i_prefetch: %s\n", (get_write_around_status() & MCACHE_CTL_L1I_PREFETCH_EN) ? "Enabled" : "Disabled");
+        ret = sprintf(buf, "l1i_prefetch: %s\n", (sbi_andes_get_write_around_status() & MCACHE_CTL_L1I_PREFETCH_EN) ? "Enabled" : "Disabled");
     } else if (!strncmp(file->f_path.dentry->d_name.name, "l1d_prefetch", 12)) {
-        ret = sprintf(buf, "l1d_prefetch: %s\n", (get_write_around_status() & MCACHE_CTL_L1D_PREFETCH_EN) ? "Enabled" : "Disabled");
+        ret = sprintf(buf, "l1d_prefetch: %s\n", (sbi_andes_get_write_around_status() & MCACHE_CTL_L1D_PREFETCH_EN) ? "Enabled" : "Disabled");
     } else if (!strncmp(file->f_path.dentry->d_name.name, "mcache_ctl", 10)) {
-        ret = sprintf(buf, "mcache_ctl: %lx\n", get_write_around_status());
+        ret = sprintf(buf, "mcache_ctl: %lx\n", sbi_andes_get_write_around_status());
     } else if (!strncmp(file->f_path.dentry->d_name.name, "mmisc_ctl", 9)) {
-        ret = sprintf(buf, "mmisc_ctl: %lx\n", get_non_blocking_status());
+        ret = sprintf(buf, "mmisc_ctl: %lx\n", sbi_andes_get_non_blocking_status());
     } else {
 		return -EFAULT;
     }
@@ -81,41 +81,41 @@ static ssize_t proc_write_sbi_en(struct file *file,
 		return -EFAULT;
 
 	if (!strncmp(file->f_path.dentry->d_name.name, "non_blocking", 12)) {
-		if (en && !(get_non_blocking_status() & MMISC_CTL_NON_BLOCKING_ENABLE)) {
-			sbi_enable_non_blocking_load_store();
+		if (en && !(sbi_andes_get_non_blocking_status() & MMISC_CTL_NON_BLOCKING_ENABLE)) {
+			sbi_andes_enable_non_blocking_load_store();
 			DEBUG(debug, 1, "NON-blocking: Enabled\n");
-		} else if (!en && (get_non_blocking_status() & MMISC_CTL_NON_BLOCKING_ENABLE)) {
-			sbi_disable_non_blocking_load_store();
+		} else if (!en && (sbi_andes_get_non_blocking_status() & MMISC_CTL_NON_BLOCKING_ENABLE)) {
+			sbi_andes_disable_non_blocking_load_store();
 			DEBUG(debug, 1, "NON-blocking: Disabled\n");
 		}
 	} else if (!strncmp(file->f_path.dentry->d_name.name, "write_around", 12)) {
-		if (en && !(get_write_around_status() & MCACHE_CTL_DC_WAROUND_1_EN)) {
-			sbi_enable_write_around();
+		if (en && !(sbi_andes_get_write_around_status() & MCACHE_CTL_DC_WAROUND_1_EN)) {
+			sbi_andes_enable_write_around();
 			DEBUG(debug, 1, "Write-around: Enabled\n");
-		} else if (!en && (get_write_around_status() & MCACHE_CTL_DC_WAROUND_1_EN)) {
-			sbi_disable_write_around();
+		} else if (!en && (sbi_andes_get_write_around_status() & MCACHE_CTL_DC_WAROUND_1_EN)) {
+			sbi_andes_disable_write_around();
 			DEBUG(debug, 1, "Write-around: Disabled\n");
 		}
 	} else if (!strncmp(file->f_path.dentry->d_name.name, "l1i_prefetch", 12)) {
-		if (en && !(get_write_around_status() & MCACHE_CTL_L1I_PREFETCH_EN)) {
-			sbi_enable_l1i_cache();
+		if (en && !(sbi_andes_get_write_around_status() & MCACHE_CTL_L1I_PREFETCH_EN)) {
+			sbi_andes_enable_l1i_cache();
 			DEBUG(debug, 1, "L1I_cache_Prefetch: Enabled\n");
-		} else if (!en && (get_write_around_status() & MCACHE_CTL_L1I_PREFETCH_EN)) {
-			sbi_disable_l1i_cache();
+		} else if (!en && (sbi_andes_get_write_around_status() & MCACHE_CTL_L1I_PREFETCH_EN)) {
+			sbi_andes_disable_l1i_cache();
 			DEBUG(debug, 1, "L1I_cache_Prefetch: Disabled\n");
 		}
 	} else if (!strncmp(file->f_path.dentry->d_name.name, "l1d_prefetch", 12)) {
-		if (en && !(get_write_around_status() & MCACHE_CTL_L1D_PREFETCH_EN)) {
-			sbi_enable_l1d_cache();
+		if (en && !(sbi_andes_get_write_around_status() & MCACHE_CTL_L1D_PREFETCH_EN)) {
+			sbi_andes_enable_l1d_cache();
 			DEBUG(debug, 1, "L1D_cache_Prefetch: Enabled\n");
-		} else if (!en && (get_write_around_status() & MCACHE_CTL_L1D_PREFETCH_EN)) {
-			sbi_disable_l1d_cache();
+		} else if (!en && (sbi_andes_get_write_around_status() & MCACHE_CTL_L1D_PREFETCH_EN)) {
+			sbi_andes_disable_l1d_cache();
 			DEBUG(debug, 1, "L1D_cache_Prefetch: Disabled\n");
 		}
 	} else if (!strncmp(file->f_path.dentry->d_name.name, "mcache_ctl", 10)) {
-		sbi_set_mcache_ctl(en);
+		sbi_andes_set_mcache_ctl(en);
 	} else if (!strncmp(file->f_path.dentry->d_name.name, "mmisc_ctl", 9)) {
-		sbi_set_mmisc_ctl(en);
+		sbi_andes_set_mmisc_ctl(en);
 	} else
 		return -EFAULT;
 
