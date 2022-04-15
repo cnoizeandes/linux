@@ -86,6 +86,7 @@ void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
 	int i;
 	int cpu_num = num_online_cpus();
 	int id = smp_processor_id();
+	int err;
 
 	pgprot_t pgprot = pgprot_noncached(PAGE_KERNEL);
 	ret =  __ioremap_caller(offset, size, pgprot,
@@ -117,7 +118,7 @@ void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
 		for (i = 0; i < cpu_num; i++) {
 			if(i == id)
 				continue;
-			int err = smp_call_function_single(i, sbi_andes_set_pma,
+			err = smp_call_function_single(i, sbi_andes_set_pma,
 				(void*)&pma_arg, true);
 			if(err){
 				pr_err("Core %d fails to set pma\n"
