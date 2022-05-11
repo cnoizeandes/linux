@@ -87,12 +87,28 @@ void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
 	int cpu_num = num_online_cpus();
 	int id = smp_processor_id();
 	int err;
+	bool within_memory = pfn_valid(offset >> PAGE_SHIFT);
+	pgprot_t pgprot = PAGE_KERNEL;
 
-	pgprot_t pgprot = pgprot_noncached(PAGE_KERNEL);
+	/*
+	 * MSB/Non-cacheability setting only when
+	 *     the given PA is within main memory range
+	 */
+	if (within_memory && pa_msb)
+		pgprot = pgprot_noncached(PAGE_KERNEL);
 	ret =  __ioremap_caller(offset, size, pgprot,
 		__builtin_return_address(0));
+
 #ifdef CONFIG_PMA
 	if(!pa_msb){	// PMA enable --> pa_msb==0 --> sbi_andes_set_pma()
+		/*
+		 * PMA/Non-cacheability setting only when
+		 *     the given PA is within main memory range, AND
+		 *     the given size is power of 2
+		 */
+		if (!within_memory)
+			return ret;
+
 		/* Start to setting PMA */
 		/* Check whether the value of size is power of 2 */
 		if ((size & (size-1)) != 0) {
