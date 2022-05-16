@@ -20,8 +20,19 @@
  */
 int rpmsg_ns_register_device(struct rpmsg_device *rpdev)
 {
-	strcpy(rpdev->id.name, "rpmsg_ns");
-	rpdev->driver_override = "rpmsg_ns";
+	char *driver = "rpmsg_ns", *driver_override;
+	strcpy(rpdev->id.name, driver);
+
+	driver_override = kstrndup(driver, strlen(driver), GFP_KERNEL);
+	if (!driver_override)
+		return -ENOMEM;
+
+	driver_override[strcspn(driver_override, "\n")] = '\0';
+
+	device_lock(&rpdev->dev);
+	rpdev->driver_override = driver_override;
+	device_unlock(&rpdev->dev);
+
 	rpdev->src = RPMSG_NS_ADDR;
 	rpdev->dst = RPMSG_NS_ADDR;
 
