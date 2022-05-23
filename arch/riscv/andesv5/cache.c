@@ -530,13 +530,13 @@ void l2c_pmu_event_enable(u64 config, int idx)
 int __init l2c_init(void)
 {
 	struct device_node *node ;
-	int *memory_map;
+	const int *memory_map;
 
 	node = of_find_compatible_node(NULL, NULL, "cache");
 
-	memory_map = of_get_property(node, "mmap", NULL);
+	memory_map = (const int*)of_get_property(node, "mmap", NULL);
 
-	if (memory_map && *memory_map == 0x1) {
+	if (memory_map && be32_to_cpu(*memory_map) == 0x1) {
 		L2C_REG_PER_CORE_OFFSET = 0x1000;
 		CCTL_L2_STATUS_PER_CORE_OFFSET = 0;
 		L2C_REG_STATUS_OFFSET = 0x1000;
