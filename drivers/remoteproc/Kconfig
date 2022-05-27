@@ -214,6 +214,10 @@ config STM32_RPROC
 
 	  This can be either built-in or a loadable module.
 
+config ANDES_REMOTEPROC
+	tristate "Andes remoteproc support"
+	depends on REMOTEPROC
+
 endif # REMOTEPROC
 
 endmenu
