@@ -458,8 +458,8 @@ static void ftsdc_work(struct work_struct *work)
 			do_pio_read(host);
 	}
 
-	tasklet_schedule(&host->pio_tasklet);
 	ftsdc_enable_irq(host, true);
+	tasklet_schedule(&host->pio_tasklet);
 }
 
 static void pio_tasklet(unsigned long data)

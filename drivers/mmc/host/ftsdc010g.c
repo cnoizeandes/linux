@@ -443,8 +443,8 @@ static void ftsdc_dma_complete(void *arg,
 	host->buf_active = XFER_NONE;
 	host->complete_what = COMPLETION_FINALIZE;
 	ftsdc_dma_cleanup(host);
-	tasklet_schedule(&host->pio_tasklet);
 	ftsdc_enable_irq(host, true);
+	tasklet_schedule(&host->pio_tasklet);
 }
 
 static u32 ftsdc_prepare_data_dma(struct ftsdc_host *host,
@@ -519,8 +519,8 @@ static void ftsdc_work(struct work_struct *work)
 
 		if (host->buf_active == XFER_READ)
 			do_pio_read(host);
-		tasklet_schedule(&host->pio_tasklet);
 		ftsdc_enable_irq(host, true);
+		tasklet_schedule(&host->pio_tasklet);
 	}
 }
 
