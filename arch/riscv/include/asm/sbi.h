@@ -207,7 +207,7 @@ int sbi_err_map_linux_errno(int err);
 
 void sbi_andes_suspend_prepare(char main_core, char enable);
 void sbi_andes_suspend_mem(void);
-void sbi_andes_restart(int cpu_num);
+void sbi_andes_restart(void);
 void sbi_andes_write_powerbrake(int val);
 int sbi_andes_read_powerbrake(void);
 void sbi_andes_set_suspend_mode(int suspend_mode);

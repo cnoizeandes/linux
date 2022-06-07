@@ -23,7 +23,7 @@ void sbi_andes_suspend_mem(void)
 }
 EXPORT_SYMBOL(sbi_andes_suspend_mem);
 
-void sbi_andes_restart(int cpu_num)
+void sbi_andes_restart(void)
 {
 	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_RESTART, 0, 0, 0, 0, 0, 0);
 }
