@@ -43,15 +43,15 @@ int sbi_andes_read_powerbrake(void)
 }
 EXPORT_SYMBOL(sbi_andes_read_powerbrake);
 
-void sbi_andes_set_suspend_mode(int suspend_mode)
+void sbi_andes_set_suspend_mode(unsigned int suspend_mode)
 {
 	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_SUSPEND_MODE, suspend_mode, 0, 0, 0, 0, 0);
 }
 EXPORT_SYMBOL(sbi_andes_set_suspend_mode);
 
-void sbi_andes_enter_suspend_mode(int suspend_mode, int main_core, unsigned int wake_mask, int num_cpus)
+void sbi_andes_enter_suspend_mode(int main_core, unsigned int wake_mask)
 {
-	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_ENTER_SUSPEND_MODE, suspend_mode, main_core, wake_mask, num_cpus, 0, 0);
+	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_ENTER_SUSPEND_MODE, main_core, wake_mask, 0, 0, 0, 0);
 }
 EXPORT_SYMBOL(sbi_andes_enter_suspend_mode);
 

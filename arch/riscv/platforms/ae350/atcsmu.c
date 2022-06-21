@@ -25,14 +25,14 @@ EXPORT_SYMBOL(atcsmu);
 extern int num_cpus;
 void andes_suspend2ram(void)
 {
-	sbi_andes_enter_suspend_mode(DeepSleepMode, true, *wake_mask, num_cpus);
+	sbi_andes_enter_suspend_mode(true, *wake_mask);
 }
 
 
 // main hart
 void andes_suspend2standby(void)
 {
-	sbi_andes_enter_suspend_mode(LightSleepMode, true, *wake_mask, num_cpus);
+	sbi_andes_enter_suspend_mode(true, *wake_mask);
 }
 
 // other harts
