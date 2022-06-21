@@ -25,6 +25,7 @@ EXPORT_SYMBOL(atcsmu);
 extern int num_cpus;
 void andes_suspend2ram(void)
 {
+	sbi_andes_set_suspend_mode(DeepSleepMode);
 	sbi_andes_enter_suspend_mode(true, *wake_mask);
 }
 
@@ -32,10 +33,11 @@ void andes_suspend2ram(void)
 // main hart
 void andes_suspend2standby(void)
 {
+	sbi_andes_set_suspend_mode(LightSleepMode);
 	sbi_andes_enter_suspend_mode(true, *wake_mask);
 }
 
-// other harts
+// other harts or hotplugging hart
 void atcsmu100_set_suspend_mode(void)
 {
 	if (suspend_begin == PM_SUSPEND_MEM) {
