@@ -79,6 +79,10 @@
 #define L2C_REG_C0_STATUS_OFFSET	0x80
 #define L2C_REG_C0_HPM_OFFSET	0x200
 
+/* L2 cache configuration register */
+#define V5_L2C_CFG_MAP_OFFSET       20
+#define V5_L2C_CFG_MAP_MASK         (1UL << V5_L2C_CFG_MAP_OFFSET)
+
 /* L2 CCTL status */
 #define CCTL_L2_STATUS_IDLE	0
 #define CCTL_L2_STATUS_PROCESS	1
