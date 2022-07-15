@@ -84,8 +84,12 @@ typedef struct {
 /*
  * anything below here should be completely generic
  */
-typedef __kernel_long_t	__kernel_off_t;
 typedef long long	__kernel_loff_t;
+#ifdef CONFIG_ARCH_32BIT_OFF_T
+typedef __kernel_long_t __kernel_off_t;
+#else
+typedef __kernel_loff_t __kernel_off_t;
+#endif
 typedef __kernel_long_t	__kernel_time_t;
 typedef long long __kernel_time64_t;
 typedef __kernel_long_t	__kernel_clock_t;
