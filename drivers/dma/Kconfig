@@ -88,10 +88,8 @@ config AMCC_PPC440SPE_ADMA
 config ATCDMAC300G
 	tristate "Andestech GENERIC DMA support"
 	depends on PLAT_AE350
-	depends on !ATCDMAC300
 	select DMA_ENGINE
 	select DMATEST
-	select MMC_FTSDCG
 	help
 	  Support the Andestech ATCDMAC300 controller for dmaengine.
 	  It has the capability for DMA_SLAVE and DMA_MEMCPY.

@@ -1186,7 +1186,7 @@ static const struct file_operations ftsdc_fops_state = {
 
 #define DBG_REG(_r) { .addr = SDC_## _r ## _REG, .name = #_r }
 
-struct ftsdc_reg {
+static struct ftsdc_reg {
 	unsigned short	addr;
 	unsigned char	*name;
 } debug_regs[] = {
