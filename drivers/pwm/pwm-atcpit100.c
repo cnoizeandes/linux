@@ -55,6 +55,8 @@ static void atcpit_pwmc_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 	value = PWM_READL(CHANNEL_ENABLE);
 	value &= ~(CHPWMEN(pwm->hwpwm));
 	PWM_WRITEL(value, CHANNEL_ENABLE);
+
+	pr_info("[pwm] channel:%d disable!\n", chan);
 	ap->en[chan] = 0;
 	pwm->state.enabled = 0;
 }
@@ -152,6 +154,7 @@ static int atcpit_pwmc_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 		clk_disable_unprepare(ap->clk);
 		return ret;
 	}
+	pr_info("[pwm] channel:%d enable!\n", chan);
 
 	return 0;
 }
@@ -226,6 +229,33 @@ static int atcpit_pwmc_remove(struct platform_device *pdev)
 
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int atcpit_pwmc_suspend(struct device *dev)
+{
+	struct atcpit_pwmc *ap = dev_get_drvdata(dev);
+
+	pr_info("[pwm] suspend!\n");
+
+	clk_disable_unprepare(ap->clk);
+
+	return 0;
+}
+
+static int atcpit_pwmc_resume(struct device *dev)
+{
+	struct atcpit_pwmc *ap = dev_get_drvdata(dev);
+
+	pr_info("[pwm] resume!\n");
+
+	clk_prepare_enable(ap->clk);
+
+	return 0;
+}
+#endif
+
+static SIMPLE_DEV_PM_OPS(atcpit_pwmc_pm_ops,
+			 atcpit_pwmc_suspend, atcpit_pwmc_resume);
+
 static const struct of_device_id atcpit_pwmc_dt[] = {
 	{ .compatible = "andestech,atcpit100-pwm" },
 	{ },
@@ -236,6 +266,7 @@ static struct platform_driver atcpit_pwmc_driver = {
 	.driver = {
 		.name = "atcpit100-pwm",
 		.of_match_table = atcpit_pwmc_dt,
+		.pm = &atcpit_pwmc_pm_ops,
 	},
 	.probe = atcpit_pwmc_probe,
 	.remove = atcpit_pwmc_remove,
