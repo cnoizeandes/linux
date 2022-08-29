@@ -345,6 +345,10 @@ config PMA
 	  region.  It is transparent to user.  If you want to reduce
 	  marginal code size, say N.
 
+config AMP
+	bool "AMP(Asymmetric Multi-Processing) support"
+	default n
+
 endmenu
 
 menu "Kernel features"

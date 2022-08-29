@@ -25,6 +25,11 @@ extern struct atc_smu atcsmu;
 #define MBOX_TX_BIT    0x1
 #define MBOX_RX_BIT    0x4
 
+#define MBOX_MSG       0x3fffa000
+#define MBOX_MSG_SIZE  0x4
+#define MBOX_SET_MSG   -1
+#define MBOX_SP_RUN    0
+
 #define SP_RESET_VEC_OFF 0x58
 #define RESET_N_OFF      0x44
 #define SP_CORE_BIT      0x4
@@ -32,7 +37,11 @@ extern struct atc_smu atcsmu;
 struct andes_rproc_pdata {
 	struct device *dev;
 	struct rproc *rproc;
+	int num_slave_ports;
+	u64 mp_slave_port[2];
+	u64 sp_local_mem[2];
 	int irq;
+	void __iomem *mbox_msg;
 };
 
 static void andes_rproc_kick(struct rproc *rproc, int vqid)
@@ -75,6 +84,7 @@ static int andes_rproc_start(struct rproc *rproc)
 	 * MP set ELF entry point to the SP reset vector.
 	 */
 	writel(rproc->bootaddr, atcsmu.base + SP_RESET_VEC_OFF);
+	writel(MBOX_SET_MSG, local->mbox_msg);
 
 	/*
 	 * SP state must poweroff, before it poweron.
@@ -100,9 +110,15 @@ static int andes_rproc_stop(struct rproc *rproc)
 {
 	struct device *dev = rproc->dev.parent;
 	struct andes_rproc_pdata *local = rproc->priv;
+	unsigned int msg;
 
 	dev_dbg(dev, "%s\n", __func__);
 
+	msg = readl(local->mbox_msg);
+	if (msg == MBOX_SP_RUN) {
+		writel(MBOX_SET_MSG, local->mbox_msg);
+		andes_rproc_kick(rproc, 1);
+	}
 	return 0;
 }
 
@@ -167,9 +183,83 @@ static int andes_parse_reserved_mems(struct rproc *rproc)
 	return 0;
 }
 
+static int andes_slave_port_release(struct rproc *rproc,
+					struct rproc_mem_entry *mem)
+{
+	iounmap(mem->va);
+	return 0;
+}
+
+static int andes_slave_port_alloc(struct rproc *rproc,
+					struct rproc_mem_entry *mem)
+{
+	void *va;
+
+	va = ioremap_nocache(mem->da, mem->len);
+	if (IS_ERR_OR_NULL(va))
+		return -ENOMEM;
+
+	/* Update memory entry va */
+	mem->va = va;
+	memset(mem->va, 0, mem->len);
+	return 0;
+}
+
+static int andes_parse_slave_ports(struct rproc *rproc)
+{
+	struct device *dev = rproc->dev.parent;
+	struct andes_rproc_pdata *local = rproc->priv;
+	struct device_node *slave_port_nodes = dev->of_node;
+	int i, num_slave_ports;
+
+	num_slave_ports = of_count_phandle_with_args(slave_port_nodes,
+						"slave_ports", NULL);
+	if (num_slave_ports <= 0) {
+		dev_err(dev, "need slave port to touch sp ILM/DLM\n");
+		return -EINVAL;
+	}
+
+	local->num_slave_ports = num_slave_ports;
+
+	for (i = 0; i < num_slave_ports; i++) {
+		struct resource rsc;
+		resource_size_t size;
+		struct device_node *dt_node;
+		struct rproc_mem_entry *mem;
+		int ret;
+
+		dt_node = of_parse_phandle(slave_port_nodes, "slave_ports", i);
+
+		if (!dt_node)
+			return -EINVAL;
+		if (of_device_is_available(dt_node)) {
+			ret = of_address_to_resource(dt_node, 0, &rsc);
+			if (ret < 0)
+				return ret;
+			size = resource_size(&rsc);
+			mem = rproc_mem_entry_init(dev, NULL, rsc.start,
+						(int)size, rsc.start,
+						andes_slave_port_alloc,
+						andes_slave_port_release,
+						rsc.name);
+			if (!mem)
+				return -ENOMEM;
+
+			local->mp_slave_port[i] = rsc.start;
+			local->sp_local_mem[i] = size & rsc.start;
+			rproc_add_carveout(rproc, mem);
+		}
+	}
+	return 0;
+}
+
 static int andes_parse_fw(struct rproc *rproc, const struct firmware *fw)
 {
 	int ret;
+
+	ret = andes_parse_slave_ports(rproc);
+	if (ret)
+		return ret;
 
 	ret = andes_parse_reserved_mems(rproc);
 	if (ret)
@@ -183,13 +273,101 @@ static int andes_parse_fw(struct rproc *rproc, const struct firmware *fw)
 	return ret;
 }
 
+int andes_rproc_elf_load_segments(struct rproc *rproc, const struct firmware *fw)
+{
+	struct device *dev = &rproc->dev;
+	struct andes_rproc_pdata *local = rproc->priv;
+	const void *ehdr, *phdr;
+	int i, j, ret = 0;
+	u16 phnum;
+	const u8 *elf_data = fw->data;
+	u8 class = fw_elf_get_class(fw);
+	u32 elf_phdr_get_size = elf_size_of_phdr(class);
+
+	ehdr = elf_data;
+	phnum = elf_hdr_get_e_phnum(class, ehdr);
+	phdr = elf_data + elf_hdr_get_e_phoff(class, ehdr);
+
+	/* go through the available ELF segments */
+	for (i = 0; i < phnum; i++, phdr += elf_phdr_get_size) {
+		/*
+		 * u64 da = elf_phdr_get_p_paddr(class, phdr);
+		 * sp don't need pa, it just use va.
+		 */
+
+		u64 da = elf_phdr_get_p_vaddr(class, phdr);
+		u64 memsz = elf_phdr_get_p_memsz(class, phdr);
+		u64 filesz = elf_phdr_get_p_filesz(class, phdr);
+		u64 offset = elf_phdr_get_p_offset(class, phdr);
+		u32 type = elf_phdr_get_p_type(class, phdr);
+		void *ptr;
+
+		if (type != PT_LOAD)
+			continue;
+
+		dev_dbg(dev, "phdr: type %d da 0x%llx memsz 0x%llx filesz 0x%llx\n",
+			type, da, memsz, filesz);
+
+		if (filesz > memsz) {
+			dev_err(dev, "bad phdr filesz 0x%llx memsz 0x%llx\n",
+				filesz, memsz);
+			ret = -EINVAL;
+			break;
+		}
+
+		if (offset + filesz > fw->size) {
+			dev_err(dev, "truncated fw: need 0x%llx avail 0x%zx\n",
+				offset + filesz, fw->size);
+			ret = -EINVAL;
+			break;
+		}
+
+		if (!rproc_u64_fit_in_size_t(memsz)) {
+			dev_err(dev, "size (%llx) does not fit in size_t type\n",
+				memsz);
+			ret = -EOVERFLOW;
+			break;
+		}
+
+		for (j = 0; j < local->num_slave_ports; j++) {
+			if (da == local->sp_local_mem[j])
+				da = local->mp_slave_port[j];
+		}
+
+		/* grab the kernel address for this device address */
+		ptr = rproc_da_to_va(rproc, da, memsz);
+		if (!ptr) {
+			dev_err(dev, "bad phdr da 0x%llx mem 0x%llx\n", da,
+				memsz);
+			ret = -EINVAL;
+			break;
+		}
+
+		/* put the segment where the remote processor expects it */
+		if (filesz)
+			memcpy(ptr, elf_data + offset, filesz);
+
+		/*
+		 * Zero out remaining memory for this segment.
+		 *
+		 * This isn't strictly required since dma_alloc_coherent already
+		 * did this for us. albeit harmless, we may consider removing
+		 * this.
+		 */
+		if (memsz > filesz)
+			memset(ptr + filesz, 0, memsz - filesz);
+	}
+
+	return ret;
+}
+
 static struct rproc_ops andes_rproc_ops = {
 	.start		       = andes_rproc_start,
 	.stop		       = andes_rproc_stop,
 	.kick		       = andes_rproc_kick,
 	.parse_fw	       = andes_parse_fw,
 	.find_loaded_rsc_table = rproc_elf_find_loaded_rsc_table,
-	.load                  = rproc_elf_load_segments,
+	.load                  = andes_rproc_elf_load_segments,
 	.sanity_check          = rproc_elf_sanity_check,
 	.get_boot_addr         = rproc_elf_get_boot_addr,
 };
@@ -218,6 +396,12 @@ static int andes_remoteproc_probe(struct platform_device *pdev)
 	local = rproc->priv;
 	local->rproc = rproc;
 	local->dev = dev;
+
+	local->mbox_msg = ioremap_nocache(MBOX_MSG, 4);
+	if (IS_ERR_OR_NULL(local->mbox_msg)) {
+		dev_err(&pdev->dev, "Failed to ioremap mbox_msg\n");
+		return -ENOMEM;
+	}
 
 	platform_set_drvdata(pdev, rproc);
 
@@ -256,6 +440,8 @@ static int andes_remoteproc_remove(struct platform_device *pdev)
 
 	if (atomic_read(&rproc->power) > 0)
 		rproc_shutdown(rproc);
+
+	iounmap(local->mbox_msg);
 
 	rproc_del(rproc);
 	of_reserved_mem_device_release(&pdev->dev);

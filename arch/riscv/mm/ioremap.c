@@ -65,6 +65,19 @@ static void __iomem *__ioremap_caller(phys_addr_t addr, size_t size,
  * Must be freed with iounmap.
  */
 
+#ifdef CONFIG_AMP
+#define SLAVE_PORT_ILM 0xa0000000
+#define SLAVE_PORT_DLM 0xa0200000
+static unsigned int is_slave_port(phys_addr_t offset)
+{
+	if (offset == (phys_addr_t)SLAVE_PORT_ILM)
+		return 1;
+	else if (offset == (phys_addr_t)SLAVE_PORT_DLM)
+		return 1;
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_PMA
 #define MAX_PMA 16
 unsigned long pma_used[MAX_PMA]={0};
@@ -94,8 +107,13 @@ void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
 	 * MSB/Non-cacheability setting only when
 	 *     the given PA is within main memory range
 	 */
+#ifdef CONFIG_AMP
+	if ((within_memory && pa_msb) || is_slave_port(offset))
+		pgprot = pgprot_noncached(PAGE_KERNEL);
+#else
 	if (within_memory && pa_msb)
 		pgprot = pgprot_noncached(PAGE_KERNEL);
+#endif
 	ret =  __ioremap_caller(offset, size, pgprot,
 		__builtin_return_address(0));
 
