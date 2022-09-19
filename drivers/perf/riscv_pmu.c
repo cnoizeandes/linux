@@ -57,6 +57,22 @@ static unsigned long csr_read_num(int csr_num)
 #undef switchcase_csr_read
 }
 
+static struct l2c_hw_events l2c_hw_events;
+#define EVSEL_MASK  0xf
+#define UMODE_MASK  0x4
+#define SMODE_MASK  0x2
+#define MMODE_MASK  0x1
+#define L2C_EVSEL_MASK  0xff
+#define EVSEL_OFF	0x3
+#define L2C_MARK_OFF	0x8
+#define L2C_FLAG_OFF    (L2C_MARK_OFF + EVSEL_OFF)
+
+
+bool is_l2c_event(u64 config)
+{
+	return ((config >> L2C_FLAG_OFF) == L2C_EVSEL_MASK);
+}
+
 /*
  * Read the CSR of a corresponding counter.
  */
@@ -76,6 +92,9 @@ u64 riscv_pmu_ctr_get_width_mask(struct perf_event *event)
 	int cwidth;
 	struct riscv_pmu *rvpmu = to_riscv_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
+
+	if (is_l2c_event(hwc->config))
+		rvpmu->ctr_get_width = NULL;
 
 	if (!rvpmu->ctr_get_width)
 	/**
@@ -100,6 +119,7 @@ u64 riscv_pmu_event_update(struct perf_event *event)
 	struct hw_perf_event *hwc = &event->hw;
 	u64 prev_raw_count, new_raw_count;
 	unsigned long cmask;
+	int idx = hwc->idx;
 	u64 oldval, delta;
 
 	if (!rvpmu->ctr_read)
@@ -125,6 +145,8 @@ static void riscv_pmu_stop(struct perf_event *event, int flags)
 {
 	struct hw_perf_event *hwc = &event->hw;
 	struct riscv_pmu *rvpmu = to_riscv_pmu(event->pmu);
+	struct l2c_hw_events *l2c = &l2c_hw_events;
+	int idx = hwc->idx;
 
 	WARN_ON_ONCE(hwc->state & PERF_HES_STOPPED);
 
@@ -132,6 +154,9 @@ static void riscv_pmu_stop(struct perf_event *event, int flags)
 		if (rvpmu->ctr_stop) {
 			rvpmu->ctr_stop(event, 0);
 			hwc->state |= PERF_HES_STOPPED;
+		}
+		if (is_l2c_event(hwc->config)) {
+			__test_and_clear_bit(idx, l2c->active_mask);
 		}
 		riscv_pmu_event_update(event);
 		hwc->state |= PERF_HES_UPTODATE;
@@ -145,6 +170,7 @@ int riscv_pmu_event_set_period(struct perf_event *event)
 	s64 period = hwc->sample_period;
 	int overflow = 0;
 	uint64_t max_period = riscv_pmu_ctr_get_width_mask(event);
+	int idx = hwc->idx;
 
 	if (unlikely(left <= -period)) {
 		left = period;
@@ -181,6 +207,9 @@ static void riscv_pmu_start(struct perf_event *event, int flags)
 	struct riscv_pmu *rvpmu = to_riscv_pmu(event->pmu);
 	uint64_t max_period = riscv_pmu_ctr_get_width_mask(event);
 	u64 init_val;
+	struct l2c_hw_events *l2c = &l2c_hw_events;
+	int idx = hwc->idx;
+	unsigned long irq_flags;
 
 	if (WARN_ON_ONCE(!(event->hw.state & PERF_HES_STOPPED)))
 		return;
@@ -192,6 +221,21 @@ static void riscv_pmu_start(struct perf_event *event, int flags)
 	riscv_pmu_event_set_period(event);
 	init_val = local64_read(&hwc->prev_count) & max_period;
 	rvpmu->ctr_start(event, init_val);
+	if (is_l2c_event(hwc->config))
+		goto l2c_event_start;
+	goto finish_start;
+l2c_event_start:
+	raw_spin_lock_irqsave(&l2c->pmu_lock, irq_flags);
+	if (flags & PERF_EF_RELOAD) {
+		riscv_pmu_event_set_period(event);
+	}
+	hwc->state = 0;
+	l2c->events[idx] = event;
+
+	__set_bit(idx, l2c->active_mask);
+	raw_spin_unlock_irqrestore(&l2c->pmu_lock, irq_flags);
+
+finish_start:
 	perf_event_update_userpage(event);
 }
 
@@ -200,15 +244,39 @@ static int riscv_pmu_add(struct perf_event *event, int flags)
 	struct riscv_pmu *rvpmu = to_riscv_pmu(event->pmu);
 	struct cpu_hw_events *cpuc = this_cpu_ptr(rvpmu->hw_events);
 	struct hw_perf_event *hwc = &event->hw;
+	struct l2c_hw_events *l2c = &l2c_hw_events;
+	unsigned long irq_flags;
 	int idx;
+
+	if (is_l2c_event(hwc->config))
+		goto add_l2c_event;
 
 	idx = rvpmu->ctr_get_idx(event);
 	if (idx < 0)
 		return idx;
 
-	hwc->idx = idx;
 	cpuc->events[idx] = event;
 	cpuc->n_events++;
+	__set_bit(idx, cpuc->used_mask);
+
+	goto finish_add;
+
+add_l2c_event:
+	if (l2c->n_events >= L2C_MAX_COUNTERS)
+		return -ENOSPC;
+
+	raw_spin_lock_irqsave(&l2c->pmu_lock, irq_flags);
+	idx = cpu_l2c_get_counter_idx(l2c);
+	if (WARN_ON_ONCE(idx >= L2C_MAX_COUNTERS))
+		return -ENOSPC;
+	l2c->events[idx] = event;
+	l2c->n_events++;
+	__set_bit(idx, l2c->used_mask);
+	l2c_pmu_disable_counter(idx);
+	l2c_pmu_event_enable((hwc->config >> EVSEL_OFF) & 0xff, idx);
+	raw_spin_unlock_irqrestore(&l2c->pmu_lock, irq_flags);
+finish_add:
+	hwc->idx = idx;
 	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
 	if (flags & PERF_EF_START)
 		riscv_pmu_start(event, PERF_EF_RELOAD);
@@ -224,6 +292,11 @@ static void riscv_pmu_del(struct perf_event *event, int flags)
 	struct riscv_pmu *rvpmu = to_riscv_pmu(event->pmu);
 	struct cpu_hw_events *cpuc = this_cpu_ptr(rvpmu->hw_events);
 	struct hw_perf_event *hwc = &event->hw;
+	struct l2c_hw_events *l2c = &l2c_hw_events;
+	unsigned long irq_flags;
+
+	if (is_l2c_event(hwc->config))
+		goto l2c_events_del;
 
 	riscv_pmu_stop(event, PERF_EF_UPDATE);
 	cpuc->events[hwc->idx] = NULL;
@@ -233,6 +306,18 @@ static void riscv_pmu_del(struct perf_event *event, int flags)
 	cpuc->n_events--;
 	if (rvpmu->ctr_clear_idx)
 		rvpmu->ctr_clear_idx(event);
+	goto finish_del;
+l2c_events_del:
+	l2c->events[hwc->idx] = NULL;
+
+	raw_spin_lock_irqsave(&l2c->pmu_lock, irq_flags);
+	l2c->n_events--;
+	raw_spin_unlock_irqrestore(&l2c->pmu_lock, irq_flags);
+
+	__clear_bit(hwc->idx, l2c->used_mask);
+	if (rvpmu->ctr_stop)
+		event->pmu->stop(event, PERF_EF_UPDATE);
+finish_del:
 	perf_event_update_userpage(event);
 	hwc->idx = -1;
 }
@@ -250,6 +335,7 @@ static int riscv_pmu_event_init(struct perf_event *event)
 	u64 event_config = 0;
 	uint64_t cmask;
 
+	raw_spin_lock_init(&l2c_hw_events.pmu_lock);
 	hwc->flags = 0;
 	mapped_event = rvpmu->event_map(event, &event_config);
 	if (mapped_event < 0) {
@@ -264,7 +350,13 @@ static int riscv_pmu_event_init(struct perf_event *event)
 	 * config will contain the information about counter CSR
 	 * the idx will contain the counter index
 	 */
-	hwc->config = event_config;
+	if (mapped_event == L2C_CODE_NUM_ACCESS)
+		hwc->config = L2C_C0_ACCESS << EVSEL_OFF;
+	else if (mapped_event == L2C_CODE_NUM_MISS)
+		hwc->config = L2C_C0_MISS << EVSEL_OFF;
+	else
+		hwc->config = event_config << EVSEL_OFF ;
+
 	hwc->idx = -1;
 	hwc->event_base = mapped_event;
 

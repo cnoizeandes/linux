@@ -20,6 +20,9 @@
 
 #include <asm/sbi.h>
 #include <asm/hwcap.h>
+#include <asm/andesv5/csr.h>
+#define SBI_PMU_ANDES_L2C_EVENT	0xff
+#define EVSEL_OFF	0x3
 
 union sbi_pmu_ctr_info {
 	unsigned long value;
@@ -275,7 +278,7 @@ static int pmu_sbi_ctr_get_idx(struct perf_event *event)
 
 	/* retrieve the available counter index */
 	ret = sbi_ecall(SBI_EXT_PMU, SBI_EXT_PMU_COUNTER_CFG_MATCH, cbase, cmask,
-			cflags, hwc->event_base, hwc->config, 0);
+			cflags, hwc->event_base, hwc->config >> EVSEL_OFF , 0);
 	if (ret.error) {
 		pr_debug("Not able to find a counter for event %lx config %llx\n",
 			hwc->event_base, hwc->config);
@@ -396,6 +399,11 @@ static u64 pmu_sbi_ctr_read(struct perf_event *event)
 	union sbi_pmu_ctr_info info;
 	u64 val = 0;
 
+	if (is_l2c_event(hwc->config)) {
+		val = l2c_read_counter(idx);
+		return val;
+	}
+
 	if (pmu_sbi_is_fw_event(event)) {
 		ret = sbi_ecall(SBI_EXT_PMU, SBI_EXT_PMU_COUNTER_FW_READ,
 				hwc->idx, 0, 0, 0, 0, 0);
@@ -417,6 +425,11 @@ static void pmu_sbi_ctr_start(struct perf_event *event, u64 ival)
 	struct hw_perf_event *hwc = &event->hw;
 	unsigned long flag = SBI_PMU_START_FLAG_SET_INIT_VALUE;
 
+	int idx = hwc->idx;
+	if (is_l2c_event(hwc->config)) {
+		flag = SBI_PMU_ANDES_L2C_EVENT;
+	}
+
 	ret = sbi_ecall(SBI_EXT_PMU, SBI_EXT_PMU_COUNTER_START, hwc->idx,
 			1, flag, ival, ival >> 32, 0);
 	if (ret.error && (ret.error != SBI_ERR_ALREADY_STARTED))
@@ -428,6 +441,9 @@ static void pmu_sbi_ctr_stop(struct perf_event *event, unsigned long flag)
 {
 	struct sbiret ret;
 	struct hw_perf_event *hwc = &event->hw;
+
+	if (is_l2c_event(hwc->config))
+		flag = SBI_PMU_ANDES_L2C_EVENT;
 
 	ret = sbi_ecall(SBI_EXT_PMU, SBI_EXT_PMU_COUNTER_STOP, hwc->idx, 1, flag, 0, 0, 0);
 	if (ret.error && (ret.error != SBI_ERR_ALREADY_STOPPED) &&

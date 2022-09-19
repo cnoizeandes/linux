@@ -25,6 +25,7 @@
 #define RISCV_PMU_LEGACY_PDEV_NAME	"riscv-pmu-legacy"
 
 #define RISCV_PMU_STOP_FLAG_RESET 1
+#define L2C_MAX_COUNTERS	32
 
 struct cpu_hw_events {
 	/* currently enabled events */
@@ -37,6 +38,29 @@ struct cpu_hw_events {
 	DECLARE_BITMAP(used_hw_ctrs, RISCV_MAX_COUNTERS);
 	/* currently enabled firmware counters */
 	DECLARE_BITMAP(used_fw_ctrs, RISCV_MAX_COUNTERS);
+
+/* Event code for L2c  */
+#define L2C_CORE_OFF	0x10
+#define L2C_C0_ACCESS	0xff01
+#define L2C_C0_MISS	0xff02
+#define RECV_SNOOP_DATA	0xff04
+#define L2C_CODE_NUM_ACCESS	0x10010
+#define L2C_CODE_NUM_MISS	0x10011
+
+#define RISCV_OP_UNSUPP                (-EOPNOTSUPP)
+
+#define CN_RECV_SNOOP_DATA(x)  \
+	(RECV_SNOOP_DATA + (x * L2C_CORE_OFF))
+
+bool is_l2c_event(u64 config);
+struct l2c_hw_events {
+	int n_events;
+	struct perf_event       *events[L2C_MAX_COUNTERS];
+
+	unsigned long           active_mask[BITS_TO_LONGS(L2C_MAX_COUNTERS)];
+	unsigned long           used_mask[BITS_TO_LONGS(L2C_MAX_COUNTERS)];
+
+	raw_spinlock_t          pmu_lock;
 };
 
 struct riscv_pmu {
@@ -57,6 +81,14 @@ struct riscv_pmu {
 	struct cpu_hw_events	__percpu *hw_events;
 	struct hlist_node	node;
 };
+int cpu_l2c_get_counter_idx(struct l2c_hw_events *l2c);
+void l2c_write_counter(int idx, u64 value);
+u64 l2c_read_counter(int idx);
+void l2c_pmu_disable_counter(int idx);
+void l2c_pmu_event_enable(u64 config, int idx);
+
+static void riscv_pmu_read(struct perf_event *event);
+static void riscv_pmu_stop(struct perf_event *event, int flags);
 
 #define to_riscv_pmu(p) (container_of(p, struct riscv_pmu, pmu))
 unsigned long riscv_pmu_ctr_read_csr(unsigned long csr);
