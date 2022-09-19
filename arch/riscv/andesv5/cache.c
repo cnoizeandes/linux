@@ -13,7 +13,11 @@
 #include <asm/andesv5/proc.h>
 #include <asm/andesv5/csr.h>
 #ifdef CONFIG_PERF_EVENTS
+#ifndef CONFIG_RISCV_PMU
 #include <asm/perf_event.h>
+#else
+#include <linux/perf/riscv_pmu.h>
+#endif
 #endif
 
 #define MAX_CACHE_LINE_SIZE 256

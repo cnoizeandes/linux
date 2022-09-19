@@ -52,7 +52,7 @@ config ARM_PMU
 config RISCV_PMU
 	depends on RISCV
 	bool "RISC-V PMU framework"
-	default y
+	default n
 	help
 	  Say y if you want to use CPU performance monitors on RISCV-based
 	  systems. This provides the core PMU framework that abstracts common

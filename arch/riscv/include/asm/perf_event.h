@@ -10,6 +10,7 @@
 
 #include <linux/perf_event.h>
 #include <linux/ptrace.h>
+#ifndef CONFIG_RISCV_PMU
 #include <linux/interrupt.h>
 #include <linux/irqreturn.h>
 
@@ -196,4 +197,5 @@ void l2c_write_counter(int idx, u64 value);
 u64 l2c_read_counter(int idx);
 void l2c_pmu_disable_counter(int idx);
 void l2c_pmu_event_enable(u64 config, int idx);
+#endif
 #endif /* _ASM_RISCV_PERF_EVENT_H */

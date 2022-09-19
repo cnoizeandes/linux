@@ -12,7 +12,11 @@
 #include <asm/smp.h>
 
 #ifdef CONFIG_PERF_EVENTS
+#ifndef CONFIG_RISCV_PMU
 #include <asm/perf_event.h>
+#else
+#include <linux/perf/riscv_pmu.h>
+#endif
 #endif
 
 /*

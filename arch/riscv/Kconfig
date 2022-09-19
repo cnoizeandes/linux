@@ -297,7 +297,8 @@ config RISCV_ISA_A
 choice
 	prompt "supported HPM type"
 	depends on PERF_EVENTS
-	default RISCV_BASE_HPM
+	depends on !RISCV_PMU
+	default ANDES_HPM
 
 config RISCV_BASE_HPM
 	bool "Base Hardware Performance Monitor"
