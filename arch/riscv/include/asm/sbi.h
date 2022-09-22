@@ -102,6 +102,7 @@ enum sbi_ext_andes_fid {
 	SBI_EXT_ANDES_FREE_PMA,
 	SBI_EXT_ANDES_PROBE_PMA,
 	SBI_EXT_ANDES_DCACHE_WBINVAL_ALL,
+	SBI_EXT_ANDES_HPM,
 };
 
 enum sbi_ext_pmu_fid {

@@ -24,6 +24,7 @@
 #define SBI_PMU_ANDES_L2C_EVENT	0xff
 #define EVSEL_OFF	0x3
 
+bool is_andes_hpm;
 union sbi_pmu_ctr_info {
 	unsigned long value;
 	struct {
@@ -569,7 +570,10 @@ static irqreturn_t pmu_sbi_ovf_handler(int irq, void *dev)
 	fidx = find_first_bit(cpu_hw_evt->used_hw_ctrs, RISCV_MAX_COUNTERS);
 	event = cpu_hw_evt->events[fidx];
 	if (!event) {
-		csr_clear(CSR_SIP, SIP_LCOFIP);
+		if (is_andes_hpm)
+			csr_clear(CSR_SLIP, SLIP_PMOVI);
+		else
+			csr_clear(csr_SIP, SIP_LCOFIP);
 		return IRQ_NONE;
 	}
 
@@ -577,13 +581,19 @@ static irqreturn_t pmu_sbi_ovf_handler(int irq, void *dev)
 	pmu_sbi_stop_hw_ctrs(pmu);
 
 	/* Overflow status register should only be read after counter are stopped */
-	overflow = csr_read(CSR_SSCOUNTOVF);
+	if (is_andes_hpm)
+		overflow = csr_read(CSR_SCOUNTEROVF);
+	else
+		overflow = csr_read(CSR_SSCOUNTOVF);
 
 	/**
 	 * Overflow interrupt pending bit should only be cleared after stopping
 	 * all the counters to avoid any race condition.
 	 */
-	csr_clear(CSR_SIP, SIP_LCOFIP);
+	if (is_andes_hpm)
+		csr_clear(CSR_SLIP, SLIP_PMOVI);
+	else
+		csr_clear(CSR_SIP, SIP_LCOFIP);
 
 	/* No overflow bit is set */
 	if (!overflow)
@@ -647,8 +657,13 @@ static int pmu_sbi_starting_cpu(unsigned int cpu, struct hlist_node *node)
 
 	if (riscv_isa_extension_available(NULL, SSCOFPMF)) {
 		cpu_hw_evt->irq = riscv_pmu_irq;
-		csr_clear(CSR_IP, BIT(RV_IRQ_PMU));
-		csr_set(CSR_IE, BIT(RV_IRQ_PMU));
+		if (is_andes_hpm) {
+			csr_clear(CSR_SLIP, IRQ_HPM_OVF);
+			csr_set(CSR_SLIE, IRQ_HPM_OVF);
+		} else {
+			csr_clear(CSR_SIP, BIT(RV_IRQ_PMU));
+			csr_set(CSR_SIE, BIT(RV_IRQ_PMU));
+		}
 		enable_percpu_irq(riscv_pmu_irq, IRQ_TYPE_NONE);
 	}
 
@@ -659,7 +674,10 @@ static int pmu_sbi_dying_cpu(unsigned int cpu, struct hlist_node *node)
 {
 	if (riscv_isa_extension_available(NULL, SSCOFPMF)) {
 		disable_percpu_irq(riscv_pmu_irq);
-		csr_clear(CSR_IE, BIT(RV_IRQ_PMU));
+		if (is_andes_hpm)
+			csr_clear(CSR_SLIE, IRQ_HPM_OVF);
+		else
+			csr_clear(CSR_SIE, BIT(RV_IRQ_PMU))
 	}
 
 	/* Disable all counters access for user mode now */
@@ -715,6 +733,7 @@ static int pmu_sbi_device_probe(struct platform_device *pdev)
 	int num_counters;
 	int ret = -ENODEV;
 
+	struct sbiret result;
 	pr_info("SBI PMU extension is available\n");
 	pmu = riscv_pmu_alloc();
 	if (!pmu)
@@ -725,6 +744,9 @@ static int pmu_sbi_device_probe(struct platform_device *pdev)
 		pr_err("SBI PMU extension doesn't provide any counters\n");
 		goto out_free;
 	}
+	result = sbi_ecall(SBI_EXT_ANDES,SBI_EXT_ANDES_HPM,0,0,0,0,0,0);
+	is_andes_hpm = result.value;
+
 
 	/* cache all the information about counters now */
 	if (pmu_sbi_get_ctrinfo(num_counters))
