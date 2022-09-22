@@ -74,8 +74,8 @@
 #define SIE_SSIE		(_AC(0x1, UL) << IRQ_S_SOFT)
 #define SIE_STIE		(_AC(0x1, UL) << IRQ_S_TIMER)
 #define SIE_SEIE		(_AC(0x1, UL) << IRQ_S_EXT)
-# define RV_IRQ_PMU    IRQ_PMU_OVF
-# define SIP_LCOFIP     (_AC(0x1, UL) << IRQ_PMU_OVF)
+#define RV_IRQ_PMU	IRQ_PMU_OVF
+#define SIP_LCOFIP	(_AC(0x1, UL) << IRQ_PMU_OVF)
 
 #define CSR_CYCLE		0xc00
 #define CSR_TIME		0xc01

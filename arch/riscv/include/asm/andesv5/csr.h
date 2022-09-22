@@ -139,3 +139,6 @@ extern u32 CCTL_L2_STATUS_PER_CORE_OFFSET;
 /* Supervisor control registers */
 #define CSR_SCCTLDATA			0x9cd
 #define CSR_SMISC_CTL			0x9d0
+
+#define IRQ_HPM_OVF		18
+#define SLIP_PMOVI		(_AC(0x1, UL) << IRQ_HPM_OVF)

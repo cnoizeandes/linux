@@ -26,6 +26,10 @@
 
 #define RISCV_PMU_STOP_FLAG_RESET 1
 #define L2C_MAX_COUNTERS	32
+#define BASE_COUNTERS  3
+#ifndef RISCV_MAX_COUNTERS
+#error "Please provide a valid RISCV_MAX_COUNTERS for the HPM."
+#endif
 
 struct cpu_hw_events {
 	/* currently enabled events */
@@ -38,6 +42,29 @@ struct cpu_hw_events {
 	DECLARE_BITMAP(used_hw_ctrs, RISCV_MAX_COUNTERS);
 	/* currently enabled firmware counters */
 	DECLARE_BITMAP(used_fw_ctrs, RISCV_MAX_COUNTERS);
+
+	unsigned long           active_mask[BITS_TO_LONGS(RISCV_MAX_COUNTERS)];
+	unsigned long           used_mask[BITS_TO_LONGS(RISCV_MAX_COUNTERS)];
+};
+
+/*
+ * These are the indexes of bits in counteren register *minus* 1,
+ * except for cycle.  It would be coherent if it can directly mapped
+ * to counteren bit definition, but there is a *time* register at
+ * counteren[1].  Per-cpu structure is scarce resource here.
+ *
+ * According to the spec, an implementation can support counter up to
+ * mhpmcounter31, but many high-end processors has at most 6 general
+ * PMCs, we give the definition to MHPMCOUNTER8 here.
+ */
+#define RISCV_CYCLE_COUNTER	0
+#define RISCV_INSTRET_COUNTER	2
+#define RISCV_HPM_MHPMCOUNTER3	3
+#define RISCV_HPM_MHPMCOUNTER4	4
+#define RISCV_HPM_MHPMCOUNTER5	5
+#define RISCV_HPM_MHPMCOUNTER6	6
+#define RISCV_HPM_MHPMCOUNTER7	7
+#define RISCV_HPM_MHPMCOUNTER8	8
 
 /* Event code for L2c  */
 #define L2C_CORE_OFF	0x10
