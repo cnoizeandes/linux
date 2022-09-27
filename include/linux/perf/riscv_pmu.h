@@ -108,6 +108,7 @@ struct riscv_pmu {
 	struct cpu_hw_events	__percpu *hw_events;
 	struct hlist_node	node;
 };
+void riscv_perf_interrupt(struct pt_regs *regs);
 int cpu_l2c_get_counter_idx(struct l2c_hw_events *l2c);
 void l2c_write_counter(int idx, u64 value);
 u64 l2c_read_counter(int idx);

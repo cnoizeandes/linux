@@ -25,6 +25,7 @@
 #define EVSEL_OFF	0x3
 
 bool is_andes_hpm;
+DEFINE_PER_CPU(struct riscv_pmu , *rvpmu_addr);
 union sbi_pmu_ctr_info {
 	unsigned long value;
 	struct {
@@ -44,7 +45,6 @@ union sbi_pmu_ctr_info {
  * per_cpu in case of harts with different pmu counters
  */
 static union sbi_pmu_ctr_info *pmu_ctr_list;
-static unsigned int riscv_pmu_irq;
 
 struct sbi_pmu_event_data {
 	union {
@@ -245,6 +245,17 @@ static const struct sbi_pmu_event_data pmu_cache_event_map[PERF_COUNT_HW_CACHE_M
 	},
 };
 
+typedef void (*perf_irq_t)(struct pt_regs *);
+perf_irq_t perf_irq = NULL;
+
+void riscv_reset_overflow(unsigned long status)
+{
+	if (is_andes_hpm)
+		csr_write(CSR_SCOUNTEROVF, status);
+	else
+		csr_write(CSR_SSCOUNTOVF, status);
+}
+
 static int pmu_sbi_ctr_get_width(int idx)
 {
 	return pmu_ctr_list[idx].width;
@@ -265,6 +276,7 @@ static int pmu_sbi_ctr_get_idx(struct perf_event *event)
 {
 	struct hw_perf_event *hwc = &event->hw;
 	struct riscv_pmu *rvpmu = to_riscv_pmu(event->pmu);
+	rvpmu_addr = rvpmu;
 	struct cpu_hw_events *cpuc = this_cpu_ptr(rvpmu->hw_events);
 	struct sbiret ret;
 	int idx;
@@ -355,6 +367,7 @@ static int pmu_sbi_event_map(struct perf_event *event, u64 *econfig)
 	int bSoftware;
 	u64 raw_config_val;
 	int ret;
+	perf_irq_t err = NULL;
 
 	switch (type) {
 	case PERF_TYPE_HARDWARE:
@@ -385,7 +398,7 @@ static int pmu_sbi_event_map(struct perf_event *event, u64 *econfig)
 		}
 		break;
 	default:
-		ret = -EINVAL;
+		ret = -ENOENT;
 		break;
 	}
 
@@ -550,18 +563,17 @@ static inline void pmu_sbi_start_overflow_mask(struct riscv_pmu *pmu,
 	}
 }
 
-static irqreturn_t pmu_sbi_ovf_handler(int irq, void *dev)
+static irqreturn_t pmu_sbi_ovf_handler(struct pt_regs *regs)
 {
 	struct perf_sample_data data;
-	struct pt_regs *regs;
 	struct hw_perf_event *hw_evt;
 	union sbi_pmu_ctr_info *info;
 	int lidx, hidx, fidx;
-	struct riscv_pmu *pmu;
 	struct perf_event *event;
 	unsigned long overflow;
 	unsigned long overflowed_ctrs = 0;
-	struct cpu_hw_events *cpu_hw_evt = dev;
+	struct riscv_pmu *pmu = rvpmu_addr;
+	struct cpu_hw_events *cpu_hw_evt = this_cpu_ptr(pmu->hw_events);
 
 	if (WARN_ON_ONCE(!cpu_hw_evt))
 		return IRQ_NONE;
@@ -573,7 +585,7 @@ static irqreturn_t pmu_sbi_ovf_handler(int irq, void *dev)
 		if (is_andes_hpm)
 			csr_clear(CSR_SLIP, SLIP_PMOVI);
 		else
-			csr_clear(csr_SIP, SIP_LCOFIP);
+			csr_clear(CSR_SIP, SIP_LCOFIP);
 		return IRQ_NONE;
 	}
 
@@ -586,6 +598,7 @@ static irqreturn_t pmu_sbi_ovf_handler(int irq, void *dev)
 	else
 		overflow = csr_read(CSR_SSCOUNTOVF);
 
+	riscv_reset_overflow(overflow);
 	/**
 	 * Overflow interrupt pending bit should only be cleared after stopping
 	 * all the counters to avoid any race condition.
@@ -598,8 +611,6 @@ static irqreturn_t pmu_sbi_ovf_handler(int irq, void *dev)
 	/* No overflow bit is set */
 	if (!overflow)
 		return IRQ_NONE;
-
-	regs = get_irq_regs();
 
 	for_each_set_bit(lidx, cpu_hw_evt->used_hw_ctrs, RISCV_MAX_COUNTERS) {
 		struct perf_event *event = cpu_hw_evt->events[lidx];
@@ -644,6 +655,12 @@ static irqreturn_t pmu_sbi_ovf_handler(int irq, void *dev)
 	return IRQ_HANDLED;
 }
 
+void riscv_perf_interrupt(struct pt_regs *regs)
+{
+	pmu_sbi_ovf_handler(regs);
+	sbi_ecall(SBI_EXT_ANDES, SBI_EXT_ANDES_SET_PFM, 0, 0, 0, 0, 0, 0);
+}
+
 static int pmu_sbi_starting_cpu(unsigned int cpu, struct hlist_node *node)
 {
 	struct riscv_pmu *pmu = hlist_entry_safe(node, struct riscv_pmu, node);
@@ -655,16 +672,12 @@ static int pmu_sbi_starting_cpu(unsigned int cpu, struct hlist_node *node)
 	/* Stop all the counters so that they can be enabled from perf */
 	pmu_sbi_stop_all(pmu);
 
-	if (riscv_isa_extension_available(NULL, SSCOFPMF)) {
-		cpu_hw_evt->irq = riscv_pmu_irq;
-		if (is_andes_hpm) {
-			csr_clear(CSR_SLIP, IRQ_HPM_OVF);
-			csr_set(CSR_SLIE, IRQ_HPM_OVF);
-		} else {
-			csr_clear(CSR_SIP, BIT(RV_IRQ_PMU));
-			csr_set(CSR_SIE, BIT(RV_IRQ_PMU));
-		}
-		enable_percpu_irq(riscv_pmu_irq, IRQ_TYPE_NONE);
+	if (is_andes_hpm) {
+		csr_clear(CSR_SLIP, IRQ_HPM_OVF);
+		csr_set(CSR_SLIE, IRQ_HPM_OVF);
+	} else {
+		csr_clear(CSR_SIP, BIT(RV_IRQ_PMU));
+		csr_set(CSR_SIE, BIT(RV_IRQ_PMU));
 	}
 
 	return 0;
@@ -672,13 +685,10 @@ static int pmu_sbi_starting_cpu(unsigned int cpu, struct hlist_node *node)
 
 static int pmu_sbi_dying_cpu(unsigned int cpu, struct hlist_node *node)
 {
-	if (riscv_isa_extension_available(NULL, SSCOFPMF)) {
-		disable_percpu_irq(riscv_pmu_irq);
-		if (is_andes_hpm)
-			csr_clear(CSR_SLIE, IRQ_HPM_OVF);
-		else
-			csr_clear(CSR_SIE, BIT(RV_IRQ_PMU))
-	}
+	if (is_andes_hpm)
+		csr_clear(CSR_SLIE, IRQ_HPM_OVF);
+	else
+		csr_clear(CSR_SIE, BIT(RV_IRQ_PMU));
 
 	/* Disable all counters access for user mode now */
 	csr_write(CSR_SCOUNTEREN, 0x0);
@@ -686,46 +696,13 @@ static int pmu_sbi_dying_cpu(unsigned int cpu, struct hlist_node *node)
 	return 0;
 }
 
-static int pmu_sbi_setup_irqs(struct riscv_pmu *pmu, struct platform_device *pdev)
-{
-	int ret;
-	struct cpu_hw_events __percpu *hw_events = pmu->hw_events;
-	struct device_node *cpu, *child;
-	struct irq_domain *domain = NULL;
+static const struct riscv_pmu riscv_base_pmu = {
+};
 
-	if (!riscv_isa_extension_available(NULL, SSCOFPMF))
-		return -EOPNOTSUPP;
-
-	for_each_of_cpu_node(cpu) {
-		child = of_get_compatible_child(cpu, "riscv,cpu-intc");
-		if (!child) {
-			pr_err("Failed to find INTC node\n");
-			return -ENODEV;
-		}
-		domain = irq_find_host(child);
-		of_node_put(child);
-		if (domain)
-			break;
-	}
-	if (!domain) {
-		pr_err("Failed to find INTC IRQ root domain\n");
-		return -ENODEV;
-	}
-
-	riscv_pmu_irq = irq_create_mapping(domain, RV_IRQ_PMU);
-	if (!riscv_pmu_irq) {
-		pr_err("Failed to map PMU interrupt for node\n");
-		return -ENODEV;
-	}
-
-	ret = request_percpu_irq(riscv_pmu_irq, pmu_sbi_ovf_handler, "riscv-pmu", hw_events);
-	if (ret) {
-		pr_err("registering percpu irq failed [%d]\n", ret);
-		return ret;
-	}
-
-	return 0;
-}
+static const struct of_device_id riscv_pmu_of_ids[] = {
+	{.compatible = "riscv,andes-pmu", .data = &riscv_base_pmu},
+	{ /* sentinel value */ }
+};
 
 static int pmu_sbi_device_probe(struct platform_device *pdev)
 {
@@ -735,6 +712,8 @@ static int pmu_sbi_device_probe(struct platform_device *pdev)
 
 	struct sbiret result;
 	pr_info("SBI PMU extension is available\n");
+	struct device_node *node = of_find_node_by_type(NULL, "pmu");
+	const struct of_device_id *of_id;
 	pmu = riscv_pmu_alloc();
 	if (!pmu)
 		return -ENOMEM;
@@ -747,17 +726,19 @@ static int pmu_sbi_device_probe(struct platform_device *pdev)
 	result = sbi_ecall(SBI_EXT_ANDES,SBI_EXT_ANDES_HPM,0,0,0,0,0,0);
 	is_andes_hpm = result.value;
 
+	if (is_andes_hpm && riscv_isa_extension_available(NULL, SSCOFPMF))
+		pr_err("Warning: The ISA string should not contain SSCOFPMF");
+	else if (!is_andes_hpm && !riscv_isa_extension_available(NULL, SSCOFPMF))
+		pr_err("Warning: The ISA string should contain SSCOFPMF");
+	if (node) {
+		of_id = of_match_node(riscv_pmu_of_ids, node);
+		of_node_put(node);
+	}
 
 	/* cache all the information about counters now */
 	if (pmu_sbi_get_ctrinfo(num_counters))
 		goto out_free;
 
-	ret = pmu_sbi_setup_irqs(pmu, pdev);
-	if (ret < 0) {
-		pr_info("Perf sampling/filtering is not supported as sscof extension is not available\n");
-		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
-		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_EXCLUDE;
-	}
 	pmu->num_counters = num_counters;
 	pmu->ctr_start = pmu_sbi_ctr_start;
 	pmu->ctr_stop = pmu_sbi_ctr_stop;
@@ -770,8 +751,7 @@ static int pmu_sbi_device_probe(struct platform_device *pdev)
 	ret = cpuhp_state_add_instance(CPUHP_AP_PERF_RISCV_STARTING, &pmu->node);
 	if (ret)
 		return ret;
-
-	ret = perf_pmu_register(&pmu->pmu, "cpu", PERF_TYPE_RAW);
+	ret = perf_pmu_register(&pmu->pmu, "andes-base", PERF_TYPE_RAW);
 	if (ret) {
 		cpuhp_state_remove_instance(CPUHP_AP_PERF_RISCV_STARTING, &pmu->node);
 		return ret;

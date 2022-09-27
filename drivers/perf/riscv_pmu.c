@@ -17,6 +17,8 @@
 
 #include <asm/sbi.h>
 
+#define HPM_FORMAT_ATTR(x,y) PMU_FORMAT_ATTR(x,#y)
+
 static unsigned long csr_read_num(int csr_num)
 {
 #define switchcase_csr_read(__csr_num, __val)		{\
@@ -57,6 +59,7 @@ static unsigned long csr_read_num(int csr_num)
 #undef switchcase_csr_read
 }
 
+static cpumask_t pmu_cpu;
 static struct l2c_hw_events l2c_hw_events;
 #define EVSEL_MASK  0xf
 #define UMODE_MASK  0x4
@@ -376,12 +379,47 @@ static int riscv_pmu_event_init(struct perf_event *event)
 	return 0;
 }
 
+HPM_FORMAT_ATTR(event, "config:0-63");
+
+static struct attribute *riscv_arch_formats_attr[] = {
+	&format_attr_event.attr,
+	NULL,
+};
+
+static struct attribute_group riscv_pmu_format_group = {
+	.name = "format",
+	.attrs = riscv_arch_formats_attr,
+};
+
+static ssize_t riscv_pmu_cpumask_show(struct device *dev,struct device_attribute *attr,char *buf)
+{
+	return cpumap_print_to_pagebuf(true, buf, &pmu_cpu);
+}
+
+static DEVICE_ATTR(cpus, 0444, riscv_pmu_cpumask_show, NULL);
+
+static struct attribute *riscv_pmu_common_attrs[] = {
+	&dev_attr_cpus.attr,
+	NULL,
+};
+
+static struct attribute_group riscv_pmu_common_group = {
+	.attrs = riscv_pmu_common_attrs,
+};
+
+static const struct attribute_group *riscv_pmu_attr_groups[] = {
+	&riscv_pmu_format_group,
+	&riscv_pmu_common_group,
+	NULL,
+};
+
 struct riscv_pmu *riscv_pmu_alloc(void)
 {
 	struct riscv_pmu *pmu;
 	int cpuid, i;
 	struct cpu_hw_events *cpuc;
 
+	cpumask_setall(&pmu_cpu);
 	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
 	if (!pmu)
 		goto out;
@@ -399,6 +437,8 @@ struct riscv_pmu *riscv_pmu_alloc(void)
 			cpuc->events[i] = NULL;
 	}
 	pmu->pmu = (struct pmu) {
+		.name = "andes-base",
+		.attr_groups = riscv_pmu_attr_groups,
 		.event_init	= riscv_pmu_event_init,
 		.add		= riscv_pmu_add,
 		.del		= riscv_pmu_del,
