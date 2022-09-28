@@ -23,7 +23,7 @@
 #define DUAL_EDGE			7
 #define DEBOUNCE_ENABLE			0x70
 
-#define ATCGPIO100_VIRTUAL_IRQ_BASE	32
+#define ATCGPIO100_VIRTUAL_IRQ_BASE	0
 
 struct atcgpio_priv {
 	struct gpio_chip gc;
