@@ -102,6 +102,7 @@ struct __riscv_v_ext_state {
 	unsigned long vl;
 	unsigned long vtype;
 	unsigned long vcsr;
+	unsigned long vlenb;
 	void *datap;
 	/*
 	 * In signal handler, datap will be set a correct user stack offset
