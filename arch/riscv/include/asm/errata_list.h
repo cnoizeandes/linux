@@ -13,7 +13,8 @@
 
 #ifdef CONFIG_ERRATA_ANDES
 #define ERRATA_ANDES_NO_IOCP 0
-#define ERRATA_ANDES_NUMBER 1
+#define ERRATA_ANDES_PMU 1
+#define ERRATA_ANDES_NUMBER 2
 #endif
 
 #ifdef CONFIG_ERRATA_SIFIVE
@@ -150,13 +151,31 @@ asm volatile(ALTERNATIVE_2(						\
 #define THEAD_C9XX_RV_IRQ_PMU			17
 #define THEAD_C9XX_CSR_SCOUNTEROF		0x5c5
 
+#define ANDES_RV_IRQ_PMU			18
+#define ANDES_SLI_CAUSE_BASE			(BITS_PER_LONG << 2)
+#define ANDES_CSR_SCOUNTEROF			0x9d4
+#define ANDES_CSR_SLIE				0x9c4
+#define ANDES_CSR_SLIP				0x9c5
+
 #define ALT_SBI_PMU_OVERFLOW(__ovl)					\
-asm volatile(ALTERNATIVE(						\
+asm volatile(ALTERNATIVE_2(						\
 	"csrr %0, " __stringify(CSR_SSCOUNTOVF),			\
 	"csrr %0, " __stringify(THEAD_C9XX_CSR_SCOUNTEROF),		\
 		THEAD_VENDOR_ID, ERRATA_THEAD_PMU,			\
-		CONFIG_ERRATA_THEAD_PMU)				\
+		CONFIG_ERRATA_THEAD_PMU,				\
+	"csrr %0, " __stringify(ANDES_CSR_SCOUNTEROF),			\
+		ANDES_VENDOR_ID, ERRATA_ANDES_PMU,			\
+		CONFIG_ERRATA_ANDES_PMU)				\
 	: "=r" (__ovl) :						\
+	: "memory")
+
+#define ALT_SBI_PMU_OVF_CLEAR_PENDING(__irq_mask)			\
+asm volatile(ALTERNATIVE(						\
+	"csrc " __stringify(CSR_IP) ", %0\n\t",				\
+	"csrc " __stringify(ANDES_CSR_SLIP) ", %0\n\t",			\
+		ANDES_VENDOR_ID, ERRATA_ANDES_PMU,			\
+		CONFIG_ERRATA_ANDES_PMU)				\
+	: : "r"(__irq_mask)						\
 	: "memory")
 
 #endif /* __ASSEMBLY__ */

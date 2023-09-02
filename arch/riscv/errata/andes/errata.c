@@ -56,11 +56,54 @@ static bool errata_probe_iocp(unsigned int stage, unsigned long arch_id, unsigne
 	return true;
 }
 
+static bool errata_probe_pmu(unsigned int stage,
+			     unsigned long arch_id, unsigned long impid)
+{
+	if (!IS_ENABLED(CONFIG_ERRATA_ANDES_PMU))
+		return false;
+
+	if ((arch_id & 0xff) != 0x45)
+		return false;
+
+	if (stage == RISCV_ALTERNATIVES_EARLY_BOOT)
+		return false;
+
+	return true;
+}
+
+static u32 andes_errata_probe(unsigned int stage,
+			      unsigned long archid, unsigned long impid)
+{
+	u32 cpu_req_errata = 0;
+
+	if (errata_probe_pmu(stage, archid, impid))
+		cpu_req_errata |= BIT(ERRATA_ANDES_PMU);
+
+	return cpu_req_errata;
+}
+
 void __init_or_module andes_errata_patch_func(struct alt_entry *begin, struct alt_entry *end,
 					      unsigned long archid, unsigned long impid,
 					      unsigned int stage)
 {
+	struct alt_entry *alt;
+	u32 cpu_req_errata = andes_errata_probe(stage, archid, impid);
+	u32 tmp;
+
 	errata_probe_iocp(stage, archid, impid);
 
-	/* we have nothing to patch here ATM so just return back */
+	for (alt = begin; alt < end; alt++) {
+		if (alt->vendor_id != ANDES_VENDOR_ID)
+			continue;
+		if (alt->patch_id >= ERRATA_ANDES_NUMBER)
+			continue;
+
+		tmp = (1U << alt->patch_id);
+		if (cpu_req_errata & tmp) {
+			mutex_lock(&text_mutex);
+			patch_text_nosync(ALT_OLD_PTR(alt), ALT_ALT_PTR(alt),
+					  alt->alt_len);
+			mutex_unlock(&text_mutex);
+		}
+	}
 }
