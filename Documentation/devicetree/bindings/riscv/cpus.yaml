@@ -98,7 +98,9 @@ properties:
         const: 1
 
       compatible:
-        const: riscv,cpu-intc
+        enum:
+          - riscv,cpu-intc
+          - andestech,cpu-intc
 
       interrupt-controller: true
 
