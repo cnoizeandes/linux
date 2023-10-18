@@ -1,23 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *	xt_connmark - Netfilter module to operate on connection marks
  *
- *	Copyright (C) 2002,2004 MARA Systems AB <http://www.marasystems.com>
+ *	Copyright (C) 2002,2004 MARA Systems AB <https://www.marasystems.com>
  *	by Henrik Nordstrom <hno@marasystems.com>
  *	Copyright © CC Computer Consultants GmbH, 2007 - 2008
  *	Jan Engelhardt <jengelh@medozas.de>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <linux/module.h>
@@ -36,13 +24,13 @@ MODULE_ALIAS("ipt_connmark");
 MODULE_ALIAS("ip6t_connmark");
 
 static unsigned int
-connmark_tg_shift(struct sk_buff *skb,
-		const struct xt_connmark_tginfo1 *info,
-		u8 shift_bits, u8 shift_dir)
+connmark_tg_shift(struct sk_buff *skb, const struct xt_connmark_tginfo2 *info)
 {
 	enum ip_conntrack_info ctinfo;
+	u_int32_t new_targetmark;
 	struct nf_conn *ct;
 	u_int32_t newmark;
+	u_int32_t oldmark;
 
 	ct = nf_ct_get(skb, &ctinfo);
 	if (ct == NULL)
@@ -50,35 +38,41 @@ connmark_tg_shift(struct sk_buff *skb,
 
 	switch (info->mode) {
 	case XT_CONNMARK_SET:
-		newmark = (ct->mark & ~info->ctmask) ^ info->ctmark;
-		if (shift_dir == D_SHIFT_RIGHT)
-			newmark >>= shift_bits;
+		oldmark = READ_ONCE(ct->mark);
+		newmark = (oldmark & ~info->ctmask) ^ info->ctmark;
+		if (info->shift_dir == D_SHIFT_RIGHT)
+			newmark >>= info->shift_bits;
 		else
-			newmark <<= shift_bits;
-		if (ct->mark != newmark) {
-			ct->mark = newmark;
+			newmark <<= info->shift_bits;
+
+		if (READ_ONCE(ct->mark) != newmark) {
+			WRITE_ONCE(ct->mark, newmark);
 			nf_conntrack_event_cache(IPCT_MARK, ct);
 		}
 		break;
 	case XT_CONNMARK_SAVE:
-		newmark = (ct->mark & ~info->ctmask) ^
-			  (skb->mark & info->nfmask);
-		if (shift_dir == D_SHIFT_RIGHT)
-			newmark >>= shift_bits;
+		new_targetmark = (skb->mark & info->nfmask);
+		if (info->shift_dir == D_SHIFT_RIGHT)
+			new_targetmark >>= info->shift_bits;
 		else
-			newmark <<= shift_bits;
-		if (ct->mark != newmark) {
-			ct->mark = newmark;
+			new_targetmark <<= info->shift_bits;
+
+		newmark = (READ_ONCE(ct->mark) & ~info->ctmask) ^
+			  new_targetmark;
+		if (READ_ONCE(ct->mark) != newmark) {
+			WRITE_ONCE(ct->mark, newmark);
 			nf_conntrack_event_cache(IPCT_MARK, ct);
 		}
 		break;
 	case XT_CONNMARK_RESTORE:
-		newmark = (skb->mark & ~info->nfmask) ^
-			  (ct->mark & info->ctmask);
-		if (shift_dir == D_SHIFT_RIGHT)
-			newmark >>= shift_bits;
+		new_targetmark = (READ_ONCE(ct->mark) & info->ctmask);
+		if (info->shift_dir == D_SHIFT_RIGHT)
+			new_targetmark >>= info->shift_bits;
 		else
-			newmark <<= shift_bits;
+			new_targetmark <<= info->shift_bits;
+
+		newmark = (skb->mark & ~info->nfmask) ^
+			  new_targetmark;
 		skb->mark = newmark;
 		break;
 	}
@@ -89,8 +83,14 @@ static unsigned int
 connmark_tg(struct sk_buff *skb, const struct xt_action_param *par)
 {
 	const struct xt_connmark_tginfo1 *info = par->targinfo;
+	const struct xt_connmark_tginfo2 info2 = {
+		.ctmark	= info->ctmark,
+		.ctmask	= info->ctmask,
+		.nfmask	= info->nfmask,
+		.mode	= info->mode,
+	};
 
-	return connmark_tg_shift(skb, info, 0, 0);
+	return connmark_tg_shift(skb, &info2);
 }
 
 static unsigned int
@@ -98,8 +98,7 @@ connmark_tg_v2(struct sk_buff *skb, const struct xt_action_param *par)
 {
 	const struct xt_connmark_tginfo2 *info = par->targinfo;
 
-	return connmark_tg_shift(skb, (const struct xt_connmark_tginfo1 *)info,
-				 info->shift_bits, info->shift_dir);
+	return connmark_tg_shift(skb, info);
 }
 
 static int connmark_tg_check(const struct xt_tgchk_param *par)
@@ -129,7 +128,7 @@ connmark_mt(const struct sk_buff *skb, struct xt_action_param *par)
 	if (ct == NULL)
 		return false;
 
-	return ((ct->mark & info->mask) == info->mark) ^ info->invert;
+	return ((READ_ONCE(ct->mark) & info->mask) == info->mark) ^ info->invert;
 }
 
 static int connmark_mt_check(const struct xt_mtchk_param *par)
@@ -202,7 +201,7 @@ static int __init connmark_mt_init(void)
 static void __exit connmark_mt_exit(void)
 {
 	xt_unregister_match(&connmark_mt_reg);
-	xt_unregister_target(connmark_tg_reg);
+	xt_unregister_targets(connmark_tg_reg, ARRAY_SIZE(connmark_tg_reg));
 }
 
 module_init(connmark_mt_init);

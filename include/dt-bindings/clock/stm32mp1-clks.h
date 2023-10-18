@@ -76,7 +76,7 @@
 #define I2C6		63
 #define USART1		64
 #define RTCAPB		65
-#define TZC		66
+#define TZC1		66
 #define TZPC		67
 #define IWDG1		68
 #define BSEC		69
@@ -123,6 +123,7 @@
 #define CRC1		110
 #define USBH		111
 #define ETHSTP		112
+#define TZC2		113
 
 /* Kernel clocks */
 #define SDMMC1_K	118
@@ -228,7 +229,6 @@
 #define CK_MCO2		212
 
 /* TRACE & DEBUG clocks */
-#define DBG		213
 #define CK_DBG		214
 #define CK_TRACE	215
 
@@ -248,7 +248,27 @@
 
 #define STM32MP1_LAST_CLK 232
 
-#define LTDC_K		LTDC_PX
-#define ETHMAC_K	ETHCK_K
+/* SCMI clock identifiers */
+#define CK_SCMI_HSE		0
+#define CK_SCMI_HSI		1
+#define CK_SCMI_CSI		2
+#define CK_SCMI_LSE		3
+#define CK_SCMI_LSI		4
+#define CK_SCMI_PLL2_Q		5
+#define CK_SCMI_PLL2_R		6
+#define CK_SCMI_MPU		7
+#define CK_SCMI_AXI		8
+#define CK_SCMI_BSEC		9
+#define CK_SCMI_CRYP1		10
+#define CK_SCMI_GPIOZ		11
+#define CK_SCMI_HASH1		12
+#define CK_SCMI_I2C4		13
+#define CK_SCMI_I2C6		14
+#define CK_SCMI_IWDG1		15
+#define CK_SCMI_RNG1		16
+#define CK_SCMI_RTC		17
+#define CK_SCMI_RTCAPB		18
+#define CK_SCMI_SPI6		19
+#define CK_SCMI_USART1		20
 
 #endif /* _DT_BINDINGS_STM32MP1_CLKS_H_ */

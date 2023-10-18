@@ -1,15 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2004 Evgeniy Polyakov <zbr@ioremap.net>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include <linux/delay.h>
@@ -26,6 +17,7 @@
 #include <linux/kthread.h>
 #include <linux/freezer.h>
 #include <linux/hwmon.h>
+#include <linux/of.h>
 
 #include <linux/atomic.h>
 
@@ -33,6 +25,8 @@
 #include "w1_netlink.h"
 
 #define W1_FAMILY_DEFAULT	0
+#define W1_FAMILY_DS28E04       0x1C /* for crc quirk */
+
 
 static int w1_timeout = 10;
 module_param_named(timeout, w1_timeout, int, 0);
@@ -168,7 +162,7 @@ static const struct attribute_group *w1_slave_default_groups[] = {
 	NULL,
 };
 
-static struct w1_family_ops w1_default_fops = {
+static const struct w1_family_ops w1_default_fops = {
 	.groups		= w1_slave_default_groups,
 };
 
@@ -621,7 +615,7 @@ end:
 
 static int w1_family_notify(unsigned long action, struct w1_slave *sl)
 {
-	struct w1_family_ops *fops;
+	const struct w1_family_ops *fops;
 	int err;
 
 	fops = sl->family->fops;
@@ -686,6 +680,8 @@ static int __w1_attach_slave_device(struct w1_slave *sl)
 	sl->dev.bus = &w1_bus_type;
 	sl->dev.release = &w1_slave_release;
 	sl->dev.groups = w1_slave_groups;
+	sl->dev.of_node = of_find_matching_node(sl->master->dev.of_node,
+						sl->family->of_match_table);
 
 	dev_set_name(&sl->dev, "%02x-%012llx",
 		 (unsigned int) sl->reg_num.family,
@@ -751,7 +747,7 @@ int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 
 	/* slave modules need to be loaded in a context with unlocked mutex */
 	mutex_unlock(&dev->mutex);
-	request_module("w1-family-0x%02x", rn->family);
+	request_module("w1-family-0x%02X", rn->family);
 	mutex_lock(&dev->mutex);
 
 	spin_lock(&w1_flock);
@@ -919,11 +915,44 @@ void w1_reconnect_slaves(struct w1_family *f, int attach)
 	mutex_unlock(&w1_mlock);
 }
 
+static int w1_addr_crc_is_valid(struct w1_master *dev, u64 rn)
+{
+	u64 rn_le = cpu_to_le64(rn);
+	struct w1_reg_num *tmp = (struct w1_reg_num *)&rn;
+	u8 crc;
+
+	crc = w1_calc_crc8((u8 *)&rn_le, 7);
+
+	/* quirk:
+	 *   DS28E04 (1w eeprom) has strapping pins to change
+	 *   address, but will not update the crc. So normal rules
+	 *   for consistent w1 addresses are violated. We test
+	 *   with the 7 LSBs of the address forced high.
+	 *
+	 *   (char*)&rn_le = { family, addr_lsb, ..., addr_msb, crc }.
+	 */
+	if (crc != tmp->crc && tmp->family == W1_FAMILY_DS28E04) {
+		u64 corr_le = rn_le;
+
+		((u8 *)&corr_le)[1] |= 0x7f;
+		crc = w1_calc_crc8((u8 *)&corr_le, 7);
+
+		dev_info(&dev->dev, "DS28E04 crc workaround on %02x.%012llx.%02x\n",
+			tmp->family, (unsigned long long)tmp->id, tmp->crc);
+	}
+
+	if (crc != tmp->crc) {
+		dev_dbg(&dev->dev, "w1 addr crc mismatch: %02x.%012llx.%02x != 0x%02x.\n",
+			tmp->family, (unsigned long long)tmp->id, tmp->crc, crc);
+		return 0;
+	}
+	return 1;
+}
+
 void w1_slave_found(struct w1_master *dev, u64 rn)
 {
 	struct w1_slave *sl;
 	struct w1_reg_num *tmp;
-	u64 rn_le = cpu_to_le64(rn);
 
 	atomic_inc(&dev->refcnt);
 
@@ -933,7 +962,7 @@ void w1_slave_found(struct w1_master *dev, u64 rn)
 	if (sl) {
 		set_bit(W1_SLAVE_ACTIVE, &sl->flags);
 	} else {
-		if (rn && tmp->crc == w1_calc_crc8((u8 *)&rn_le, 7))
+		if (rn && w1_addr_crc_is_valid(dev, rn))
 			w1_attach_slave_device(dev, tmp);
 	}
 
@@ -1137,6 +1166,8 @@ int w1_process(void *data)
 	/* remainder if it woke up early */
 	unsigned long jremain = 0;
 
+	atomic_inc(&dev->refcnt);
+
 	for (;;) {
 
 		if (!jremain && dev->search_count) {
@@ -1164,8 +1195,10 @@ int w1_process(void *data)
 		 */
 		mutex_unlock(&dev->list_mutex);
 
-		if (kthread_should_stop())
+		if (kthread_should_stop()) {
+			__set_current_state(TASK_RUNNING);
 			break;
+		}
 
 		/* Only sleep when the search is active. */
 		if (dev->search_count) {
@@ -1230,10 +1263,10 @@ err_out_exit_init:
 
 static void __exit w1_fini(void)
 {
-	struct w1_master *dev;
+	struct w1_master *dev, *n;
 
 	/* Set netlink removal messages and some cleanup */
-	list_for_each_entry(dev, &w1_masters, w1_master_entry)
+	list_for_each_entry_safe(dev, n, &w1_masters, w1_master_entry)
 		__w1_remove_master_device(dev);
 
 	w1_fini_netlink();

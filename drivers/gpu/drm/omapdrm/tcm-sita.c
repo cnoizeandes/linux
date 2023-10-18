@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * SImple Tiler Allocator (SiTA): 2D and 1D allocation(reservation) algorithm
  *
@@ -5,16 +6,7 @@
  *          Lajos Molnar <molnar@ti.com>
  *          Andy Gross <andy.gross@ti.com>
  *
- * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
- *
- * This package is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * THIS PACKAGE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- *
+ * Copyright (C) 2012 Texas Instruments Incorporated - https://www.ti.com/
  */
 #include <linux/init.h>
 #include <linux/module.h>
@@ -90,7 +82,7 @@ static int l2r_t2b(u16 w, u16 h, u16 a, s16 offset,
 {
 	int i;
 	unsigned long index;
-	bool area_free;
+	bool area_free = false;
 	unsigned long slots_per_band = PAGE_SIZE / slot_bytes;
 	unsigned long bit_offset = (offset > 0) ? offset / slot_bytes : 0;
 	unsigned long curr_bit = bit_offset;
@@ -254,6 +246,5 @@ struct tcm *sita_init(u16 width, u16 height)
 	return tcm;
 
 error:
-	kfree(tcm);
 	return NULL;
 }

@@ -9,8 +9,8 @@
  * (at your option) any later version.
  */
 
-#ifndef _UAPI_ASM_ELF_H
-#define _UAPI_ASM_ELF_H
+#ifndef _UAPI_ASM_RISCV_ELF_H
+#define _UAPI_ASM_RISCV_ELF_H
 
 #include <asm/ptrace.h>
 
@@ -19,10 +19,18 @@ typedef unsigned long elf_greg_t;
 typedef struct user_regs_struct elf_gregset_t;
 #define ELF_NGREG (sizeof(elf_gregset_t) / sizeof(elf_greg_t))
 
+/* We don't support f without d, or q.  */
+typedef __u64 elf_fpreg_t;
 typedef union __riscv_fp_state elf_fpregset_t;
+#define ELF_NFPREG (sizeof(struct __riscv_d_ext_state) / sizeof(elf_fpreg_t))
 
-#define ELF_RISCV_R_SYM(r_info) ((r_info) >> 32)
-#define ELF_RISCV_R_TYPE(r_info) ((r_info) & 0xffffffff)
+#if __riscv_xlen == 64
+#define ELF_RISCV_R_SYM(r_info)		ELF64_R_SYM(r_info)
+#define ELF_RISCV_R_TYPE(r_info)	ELF64_R_TYPE(r_info)
+#else
+#define ELF_RISCV_R_SYM(r_info)		ELF32_R_SYM(r_info)
+#define ELF_RISCV_R_TYPE(r_info)	ELF32_R_TYPE(r_info)
+#endif
 
 /*
  * RISC-V relocation types
@@ -86,5 +94,24 @@ typedef union __riscv_fp_state elf_fpregset_t;
 #define R_RISCV_SET32		56
 #define R_RISCV_32_PCREL	57
 
+/* Relocation types numbered 200 and above are defined by Andes */
+#define R_RISCV_NO_RVC_REGION_BEGIN	237
+#define R_RISCV_NO_RVC_REGION_END	238
+#define R_RISCV_ALIGN_BTB	240
+#define R_RISCV_10_PCREL	241
+#define R_RISCV_DATA		242
+#define R_RISCV_LALO_HI20	243
+#define R_RISCV_LALO_LO12_I	244
+#define R_RISCV_RELAX_ENTRY	245
+#define R_RISCV_LGP18S0		246
+#define R_RISCV_LGP17S1		247
+#define R_RISCV_LGP17S2		248
+#define R_RISCV_LGP17S3		249
+#define R_RISCV_SGP18S0		250
+#define R_RISCV_SGP17S1		251
+#define R_RISCV_SGP17S2		252
+#define R_RISCV_SGP17S3		253
+#define R_RISCV_RELAX_REGION_BEGIN	254
+#define R_RISCV_RELAX_REGION_END	255
 
-#endif /* _UAPI_ASM_ELF_H */
+#endif /* _UAPI_ASM_RISCV_ELF_H */

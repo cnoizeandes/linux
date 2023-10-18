@@ -11,6 +11,10 @@
 
 #include <linux/fcntl.h>
 #include <linux/wait.h>
+#include <linux/err.h>
+#include <linux/percpu-defs.h>
+#include <linux/percpu.h>
+#include <linux/sched.h>
 
 /*
  * CAREFUL: Check include/uapi/asm-generic/fcntl.h when defining
@@ -36,8 +40,15 @@ struct file *eventfd_fget(int fd);
 struct eventfd_ctx *eventfd_ctx_fdget(int fd);
 struct eventfd_ctx *eventfd_ctx_fileget(struct file *file);
 __u64 eventfd_signal(struct eventfd_ctx *ctx, __u64 n);
+__u64 eventfd_signal_mask(struct eventfd_ctx *ctx, __u64 n, unsigned mask);
 int eventfd_ctx_remove_wait_queue(struct eventfd_ctx *ctx, wait_queue_entry_t *wait,
 				  __u64 *cnt);
+void eventfd_ctx_do_read(struct eventfd_ctx *ctx, __u64 *cnt);
+
+static inline bool eventfd_signal_allowed(void)
+{
+	return !current->in_eventfd;
+}
 
 #else /* CONFIG_EVENTFD */
 
@@ -51,7 +62,13 @@ static inline struct eventfd_ctx *eventfd_ctx_fdget(int fd)
 	return ERR_PTR(-ENOSYS);
 }
 
-static inline int eventfd_signal(struct eventfd_ctx *ctx, int n)
+static inline int eventfd_signal(struct eventfd_ctx *ctx, __u64 n)
+{
+	return -ENOSYS;
+}
+
+static inline int eventfd_signal_mask(struct eventfd_ctx *ctx, __u64 n,
+				      unsigned mask)
 {
 	return -ENOSYS;
 }
@@ -65,6 +82,16 @@ static inline int eventfd_ctx_remove_wait_queue(struct eventfd_ctx *ctx,
 						wait_queue_entry_t *wait, __u64 *cnt)
 {
 	return -ENOSYS;
+}
+
+static inline bool eventfd_signal_allowed(void)
+{
+	return true;
+}
+
+static inline void eventfd_ctx_do_read(struct eventfd_ctx *ctx, __u64 *cnt)
+{
+
 }
 
 #endif

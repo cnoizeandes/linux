@@ -87,6 +87,9 @@ void acpi_rs_dump_resource_list(struct acpi_resource *resource_list)
 			    ("Invalid descriptor type (%X) in resource list\n",
 			     resource_list->type);
 			return;
+		} else if (!resource_list->type) {
+			ACPI_ERROR((AE_INFO, "Invalid Zero Resource Type"));
+			return;
 		}
 
 		/* Sanity check the length. It must not be zero, or we loop forever */
@@ -256,6 +259,11 @@ acpi_rs_dump_descriptor(void *resource, struct acpi_rsdump_info *table)
 
 			acpi_rs_out_string(name,
 					   table->pointer[*target & 0x07]);
+			break;
+
+		case ACPI_RSD_6BITFLAG:
+
+			acpi_rs_out_integer8(name, (ACPI_GET8(target) & 0x3F));
 			break;
 
 		case ACPI_RSD_SHORTLIST:
@@ -539,7 +547,7 @@ static void acpi_rs_out_title(const char *title)
 
 static void acpi_rs_dump_byte_list(u16 length, u8 * data)
 {
-	u8 i;
+	u16 i;
 
 	for (i = 0; i < length; i++) {
 		acpi_os_printf("%25s%2.2X : %2.2X\n", "Byte", i, data[i]);

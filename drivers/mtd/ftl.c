@@ -201,15 +201,16 @@ static int build_maps(partition_t *part)
     /* Set up erase unit maps */
     part->DataUnits = le16_to_cpu(part->header.NumEraseUnits) -
 	part->header.NumTransferUnits;
-    part->EUNInfo = kmalloc(part->DataUnits * sizeof(struct eun_info_t),
-			    GFP_KERNEL);
+    part->EUNInfo = kmalloc_array(part->DataUnits, sizeof(struct eun_info_t),
+                                  GFP_KERNEL);
     if (!part->EUNInfo)
 	    goto out;
     for (i = 0; i < part->DataUnits; i++)
 	part->EUNInfo[i].Offset = 0xffffffff;
     part->XferInfo =
-	kmalloc(part->header.NumTransferUnits * sizeof(struct xfer_info_t),
-		GFP_KERNEL);
+	kmalloc_array(part->header.NumTransferUnits,
+                      sizeof(struct xfer_info_t),
+                      GFP_KERNEL);
     if (!part->XferInfo)
 	    goto out_EUNInfo;
 
@@ -262,15 +263,15 @@ static int build_maps(partition_t *part)
 
     /* Set up virtual page map */
     blocks = le32_to_cpu(header.FormattedSize) >> header.BlockSize;
-    part->VirtualBlockMap = vmalloc(blocks * sizeof(uint32_t));
+    part->VirtualBlockMap = vmalloc(array_size(blocks, sizeof(uint32_t)));
     if (!part->VirtualBlockMap)
 	    goto out_XferInfo;
 
     memset(part->VirtualBlockMap, 0xff, blocks * sizeof(uint32_t));
     part->BlocksPerUnit = (1 << header.EraseUnitSize) >> header.BlockSize;
 
-    part->bam_cache = kmalloc(part->BlocksPerUnit * sizeof(uint32_t),
-			      GFP_KERNEL);
+    part->bam_cache = kmalloc_array(part->BlocksPerUnit, sizeof(uint32_t),
+                                    GFP_KERNEL);
     if (!part->bam_cache)
 	    goto out_VirtualBlockMap;
 
@@ -940,7 +941,7 @@ static int ftl_write(partition_t *part, caddr_t buffer,
 
 static int ftl_getgeo(struct mtd_blktrans_dev *dev, struct hd_geometry *geo)
 {
-	partition_t *part = (void *)dev;
+	partition_t *part = container_of(dev, struct partition_t, mbd);
 	u_long sect;
 
 	/* Sort of arbitrary: round size down to 4KiB boundary */
@@ -968,7 +969,7 @@ static int ftl_writesect(struct mtd_blktrans_dev *dev,
 static int ftl_discardsect(struct mtd_blktrans_dev *dev,
 			   unsigned long sector, unsigned nr_sects)
 {
-	partition_t *part = (void *)dev;
+	partition_t *part = container_of(dev, struct partition_t, mbd);
 	uint32_t bsize = 1 << part->header.EraseUnitSize;
 
 	pr_debug("FTL erase sector %ld for %d sectors\n",
@@ -1028,7 +1029,7 @@ static void ftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 
 		partition->mbd.tr = tr;
 		partition->mbd.devnum = -1;
-		if (!add_mtd_blktrans_dev((void *)partition))
+		if (!add_mtd_blktrans_dev(&partition->mbd))
 			return;
 	}
 
@@ -1055,19 +1056,7 @@ static struct mtd_blktrans_ops ftl_tr = {
 	.owner		= THIS_MODULE,
 };
 
-static int __init init_ftl(void)
-{
-	return register_mtd_blktrans(&ftl_tr);
-}
-
-static void __exit cleanup_ftl(void)
-{
-	deregister_mtd_blktrans(&ftl_tr);
-}
-
-module_init(init_ftl);
-module_exit(cleanup_ftl);
-
+module_mtd_blktrans(ftl_tr);
 
 MODULE_LICENSE("Dual MPL/GPL");
 MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");

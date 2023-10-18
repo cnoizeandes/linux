@@ -1,20 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * drivers/input/tablet/wacom_wac.c
- *
  *  USB Wacom tablet support - Wacom specific code
- *
- */
-
-/*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #include "wacom_wac.h"
 #include "wacom.h"
 #include <linux/input/mt.h>
+#include <linux/jiffies.h>
 
 /* resolution for penabled devices */
 #define WACOM_PL_RES		20
@@ -45,6 +37,43 @@ static int wacom_numbered_button_to_key(int n);
 
 static void wacom_update_led(struct wacom *wacom, int button_count, int mask,
 			     int group);
+
+static void wacom_force_proxout(struct wacom_wac *wacom_wac)
+{
+	struct input_dev *input = wacom_wac->pen_input;
+
+	wacom_wac->shared->stylus_in_proximity = 0;
+
+	input_report_key(input, BTN_TOUCH, 0);
+	input_report_key(input, BTN_STYLUS, 0);
+	input_report_key(input, BTN_STYLUS2, 0);
+	input_report_key(input, BTN_STYLUS3, 0);
+	input_report_key(input, wacom_wac->tool[0], 0);
+	if (wacom_wac->serial[0]) {
+		input_report_abs(input, ABS_MISC, 0);
+	}
+	input_report_abs(input, ABS_PRESSURE, 0);
+
+	wacom_wac->tool[0] = 0;
+	wacom_wac->id[0] = 0;
+	wacom_wac->serial[0] = 0;
+
+	input_sync(input);
+}
+
+void wacom_idleprox_timeout(struct timer_list *list)
+{
+	struct wacom *wacom = from_timer(wacom, list, idleprox_timer);
+	struct wacom_wac *wacom_wac = &wacom->wacom_wac;
+
+	if (!wacom_wac->hid_data.sense_state) {
+		return;
+	}
+
+	hid_warn(wacom->hdev, "%s: tool appears to be hung in-prox. forcing it out.\n", __func__);
+	wacom_force_proxout(wacom_wac);
+}
+
 /*
  * Percent of battery capacity for Graphire.
  * 8th value means AC online and show 100% capacity.
@@ -255,7 +284,7 @@ static int wacom_dtu_irq(struct wacom_wac *wacom)
 
 static int wacom_dtus_irq(struct wacom_wac *wacom)
 {
-	char *data = wacom->data;
+	unsigned char *data = wacom->data;
 	struct input_dev *input = wacom->pen_input;
 	unsigned short prox, pressure = 0;
 
@@ -345,7 +374,7 @@ static int wacom_graphire_irq(struct wacom_wac *wacom)
 
 			case 2: /* Mouse with wheel */
 				input_report_key(input, BTN_MIDDLE, data[1] & 0x04);
-				/* fall through */
+				fallthrough;
 
 			case 3: /* Mouse without wheel */
 				wacom->tool[0] = BTN_TOOL_MOUSE;
@@ -487,6 +516,8 @@ static int wacom_intuos_pad(struct wacom_wac *wacom)
 	int ring1 = 0, ring2 = 0;
 	int strip1 = 0, strip2 = 0;
 	bool prox = false;
+	bool wrench = false, keyboard = false, mute_touch = false, menu = false,
+	     info = false;
 
 	/* pad packets. Works as a second tool and is always in prox */
 	if (!(data[0] == WACOM_REPORT_INTUOSPAD || data[0] == WACOM_REPORT_INTUOS5PAD ||
@@ -516,10 +547,32 @@ static int wacom_intuos_pad(struct wacom_wac *wacom)
 		keys = ((data[3] & 0x1C) ? 1<<2 : 0) |
 		       ((data[4] & 0xE0) ? 1<<1 : 0) |
 		       ((data[4] & 0x07) ? 1<<0 : 0);
+		keyboard = !!(data[4] & 0xE0);
+		info = !!(data[3] & 0x1C);
+
+		if (features->oPid) {
+			mute_touch = !!(data[4] & 0x07);
+			if (mute_touch)
+				wacom->shared->is_touch_on =
+					!wacom->shared->is_touch_on;
+		} else {
+			wrench = !!(data[4] & 0x07);
+		}
 	} else if (features->type == WACOM_27QHD) {
 		nkeys = 3;
 		keys = data[2] & 0x07;
 
+		wrench = !!(data[2] & 0x01);
+		keyboard = !!(data[2] & 0x02);
+
+		if (features->oPid) {
+			mute_touch = !!(data[2] & 0x04);
+			if (mute_touch)
+				wacom->shared->is_touch_on =
+					!wacom->shared->is_touch_on;
+		} else {
+			menu = !!(data[2] & 0x04);
+		}
 		input_report_abs(input, ABS_X, be16_to_cpup((__be16 *)&data[4]));
 		input_report_abs(input, ABS_Y, be16_to_cpup((__be16 *)&data[6]));
 		input_report_abs(input, ABS_Z, be16_to_cpup((__be16 *)&data[8]));
@@ -537,14 +590,14 @@ static int wacom_intuos_pad(struct wacom_wac *wacom)
 		 */
 		buttons = (data[4] << 1) | (data[3] & 0x01);
 	} else if (features->type == CINTIQ_COMPANION_2) {
-		/* d-pad right  -> data[4] & 0x10
-		 * d-pad up     -> data[4] & 0x20
-		 * d-pad left   -> data[4] & 0x40
-		 * d-pad down   -> data[4] & 0x80
-		 * d-pad center -> data[3] & 0x01
+		/* d-pad right  -> data[2] & 0x10
+		 * d-pad up     -> data[2] & 0x20
+		 * d-pad left   -> data[2] & 0x40
+		 * d-pad down   -> data[2] & 0x80
+		 * d-pad center -> data[1] & 0x01
 		 */
 		buttons = ((data[2] >> 4) << 7) |
-		          ((data[1] & 0x04) << 6) |
+		          ((data[1] & 0x04) << 4) |
 		          ((data[2] & 0x0F) << 2) |
 		          (data[1] & 0x03);
 	} else if (features->type >= INTUOS5S && features->type <= INTUOSPL) {
@@ -565,6 +618,9 @@ static int wacom_intuos_pad(struct wacom_wac *wacom)
 			if (features->type == WACOM_22HD) {
 				nkeys = 3;
 				keys = data[9] & 0x07;
+
+				info = !!(data[9] & 0x01);
+				wrench = !!(data[9] & 0x02);
 			}
 		} else {
 			buttons = ((data[6] & 0x10) << 5)  |
@@ -576,13 +632,25 @@ static int wacom_intuos_pad(struct wacom_wac *wacom)
 		strip2 = ((data[3] & 0x1f) << 8) | data[4];
 	}
 
-	prox = (buttons & ~(~0 << nbuttons)) | (keys & ~(~0 << nkeys)) |
+	prox = (buttons & ~(~0U << nbuttons)) | (keys & ~(~0U << nkeys)) |
 	       (ring1 & 0x80) | (ring2 & 0x80) | strip1 | strip2;
 
 	wacom_report_numbered_buttons(input, nbuttons, buttons);
 
 	for (i = 0; i < nkeys; i++)
 		input_report_key(input, KEY_PROG1 + i, keys & (1 << i));
+
+	input_report_key(input, KEY_BUTTONCONFIG, wrench);
+	input_report_key(input, KEY_ONSCREEN_KEYBOARD, keyboard);
+	input_report_key(input, KEY_CONTROLPANEL, menu);
+	input_report_key(input, KEY_INFO, info);
+
+	if (wacom->shared && wacom->shared->touch_input) {
+		input_report_switch(wacom->shared->touch_input,
+				    SW_MUTE_DEVICE,
+				    !wacom->shared->is_touch_on);
+		input_sync(wacom->shared->touch_input);
+	}
 
 	input_report_abs(input, ABS_RX, strip1);
 	input_report_abs(input, ABS_RY, strip2);
@@ -603,9 +671,26 @@ static int wacom_intuos_id_mangle(int tool_id)
 	return (tool_id & ~0xFFF) << 4 | (tool_id & 0xFFF);
 }
 
+static bool wacom_is_art_pen(int tool_id)
+{
+	bool is_art_pen = false;
+
+	switch (tool_id) {
+	case 0x885:	/* Intuos3 Marker Pen */
+	case 0x804:	/* Intuos4/5 13HD/24HD Marker Pen */
+	case 0x10804:	/* Intuos4/5 13HD/24HD Art Pen */
+		is_art_pen = true;
+		break;
+	}
+	return is_art_pen;
+}
+
 static int wacom_intuos_get_tool_type(int tool_id)
 {
-	int tool_type;
+	int tool_type = BTN_TOOL_PEN;
+
+	if (wacom_is_art_pen(tool_id))
+		return tool_type;
 
 	switch (tool_id) {
 	case 0x812: /* Inking pen */
@@ -620,16 +705,17 @@ static int wacom_intuos_get_tool_type(int tool_id)
 	case 0x852:
 	case 0x823: /* Intuos3 Grip Pen */
 	case 0x813: /* Intuos3 Classic Pen */
-	case 0x885: /* Intuos3 Marker Pen */
 	case 0x802: /* Intuos4/5 13HD/24HD General Pen */
-	case 0x804: /* Intuos4/5 13HD/24HD Marker Pen */
 	case 0x8e2: /* IntuosHT2 pen */
 	case 0x022:
-	case 0x10804: /* Intuos4/5 13HD/24HD Art Pen */
+	case 0x200: /* Pro Pen 3 */
+	case 0x04200: /* Pro Pen 3 */
+	case 0x10842: /* MobileStudio Pro Pro Pen slim */
 	case 0x14802: /* Intuos4/5 13HD/24HD Classic Pen */
 	case 0x16802: /* Cintiq 13HD Pro Pen */
 	case 0x18802: /* DTH2242 Pen */
 	case 0x10802: /* Intuos4/5 13HD/24HD General Pen */
+	case 0x80842: /* Intuos Pro and Cintiq Pro 3D Pen */
 		tool_type = BTN_TOOL_PEN;
 		break;
 
@@ -667,6 +753,7 @@ static int wacom_intuos_get_tool_type(int tool_id)
 	case 0x1480a: /* Intuos4/5 13HD/24HD Classic Pen Eraser */
 	case 0x1090a: /* Intuos4/5 13HD/24HD Airbrush Eraser */
 	case 0x1080c: /* Intuos4/5 13HD/24HD Art Pen Eraser */
+	case 0x1084a: /* MobileStudio Pro Pro Pen slim Eraser */
 	case 0x1680a: /* Cintiq 13HD Pro Pen Eraser */
 	case 0x1880a: /* DTH2242 Eraser */
 	case 0x1080a: /* Intuos4/5 13HD/24HD General Pen Eraser */
@@ -681,12 +768,47 @@ static int wacom_intuos_get_tool_type(int tool_id)
 	case 0x10902: /* Intuos4/5 13HD/24HD Airbrush */
 		tool_type = BTN_TOOL_AIRBRUSH;
 		break;
-
-	default: /* Unknown tool */
-		tool_type = BTN_TOOL_PEN;
-		break;
 	}
 	return tool_type;
+}
+
+static void wacom_exit_report(struct wacom_wac *wacom)
+{
+	struct input_dev *input = wacom->pen_input;
+	struct wacom_features *features = &wacom->features;
+	unsigned char *data = wacom->data;
+	int idx = (features->type == INTUOS) ? (data[1] & 0x01) : 0;
+
+	/*
+	 * Reset all states otherwise we lose the initial states
+	 * when in-prox next time
+	 */
+	input_report_abs(input, ABS_X, 0);
+	input_report_abs(input, ABS_Y, 0);
+	input_report_abs(input, ABS_DISTANCE, 0);
+	input_report_abs(input, ABS_TILT_X, 0);
+	input_report_abs(input, ABS_TILT_Y, 0);
+	if (wacom->tool[idx] >= BTN_TOOL_MOUSE) {
+		input_report_key(input, BTN_LEFT, 0);
+		input_report_key(input, BTN_MIDDLE, 0);
+		input_report_key(input, BTN_RIGHT, 0);
+		input_report_key(input, BTN_SIDE, 0);
+		input_report_key(input, BTN_EXTRA, 0);
+		input_report_abs(input, ABS_THROTTLE, 0);
+		input_report_abs(input, ABS_RZ, 0);
+	} else {
+		input_report_abs(input, ABS_PRESSURE, 0);
+		input_report_key(input, BTN_STYLUS, 0);
+		input_report_key(input, BTN_STYLUS2, 0);
+		input_report_key(input, BTN_TOUCH, 0);
+		input_report_abs(input, ABS_WHEEL, 0);
+		if (features->type >= INTUOS3S)
+			input_report_abs(input, ABS_Z, 0);
+	}
+	input_report_key(input, wacom->tool[idx], 0);
+	input_report_abs(input, ABS_MISC, 0); /* reset tool id */
+	input_event(input, EV_MSC, MSC_SERIAL, wacom->serial[idx]);
+	wacom->id[idx] = 0;
 }
 
 static int wacom_intuos_inout(struct wacom_wac *wacom)
@@ -704,7 +826,7 @@ static int wacom_intuos_inout(struct wacom_wac *wacom)
 	/* Enter report */
 	if ((data[1] & 0xfc) == 0xc0) {
 		/* serial number of the tool */
-		wacom->serial[idx] = ((data[3] & 0x0f) << 28) +
+		wacom->serial[idx] = ((__u64)(data[3] & 0x0f) << 28) +
 			(data[4] << 20) + (data[5] << 12) +
 			(data[6] << 4) + (data[7] >> 4);
 
@@ -741,40 +863,18 @@ static int wacom_intuos_inout(struct wacom_wac *wacom)
 		if (!wacom->id[idx])
 			return 1;
 
-		/*
-		 * Reset all states otherwise we lose the initial states
-		 * when in-prox next time
-		 */
-		input_report_abs(input, ABS_X, 0);
-		input_report_abs(input, ABS_Y, 0);
-		input_report_abs(input, ABS_DISTANCE, 0);
-		input_report_abs(input, ABS_TILT_X, 0);
-		input_report_abs(input, ABS_TILT_Y, 0);
-		if (wacom->tool[idx] >= BTN_TOOL_MOUSE) {
-			input_report_key(input, BTN_LEFT, 0);
-			input_report_key(input, BTN_MIDDLE, 0);
-			input_report_key(input, BTN_RIGHT, 0);
-			input_report_key(input, BTN_SIDE, 0);
-			input_report_key(input, BTN_EXTRA, 0);
-			input_report_abs(input, ABS_THROTTLE, 0);
-			input_report_abs(input, ABS_RZ, 0);
-		} else {
-			input_report_abs(input, ABS_PRESSURE, 0);
-			input_report_key(input, BTN_STYLUS, 0);
-			input_report_key(input, BTN_STYLUS2, 0);
-			input_report_key(input, BTN_TOUCH, 0);
-			input_report_abs(input, ABS_WHEEL, 0);
-			if (features->type >= INTUOS3S)
-				input_report_abs(input, ABS_Z, 0);
-		}
-		input_report_key(input, wacom->tool[idx], 0);
-		input_report_abs(input, ABS_MISC, 0); /* reset tool id */
-		input_event(input, EV_MSC, MSC_SERIAL, wacom->serial[idx]);
-		wacom->id[idx] = 0;
+		wacom_exit_report(wacom);
 		return 2;
 	}
 
 	return 0;
+}
+
+static inline bool touch_is_muted(struct wacom_wac *wacom_wac)
+{
+	return wacom_wac->probe_complete &&
+	       wacom_wac->shared->has_mute_touch_switch &&
+	       !wacom_wac->shared->is_touch_on;
 }
 
 static inline bool report_touch_events(struct wacom_wac *wacom)
@@ -838,6 +938,8 @@ static int wacom_intuos_general(struct wacom_wac *wacom)
 		y >>= 1;
 		distance >>= 1;
 	}
+	if (features->type == INTUOSHT2)
+		distance = features->distance_max - distance;
 	input_report_abs(input, ABS_X, x);
 	input_report_abs(input, ABS_Y, y);
 	input_report_abs(input, ABS_DISTANCE, distance);
@@ -1051,7 +1153,7 @@ static int wacom_remote_irq(struct wacom_wac *wacom_wac, size_t len)
 	input_report_key(input, BTN_BASE2, (data[11] & 0x02));
 
 	if (data[12] & 0x80)
-		input_report_abs(input, ABS_WHEEL, (data[12] & 0x7f));
+		input_report_abs(input, ABS_WHEEL, (data[12] & 0x7f) - 1);
 	else
 		input_report_abs(input, ABS_WHEEL, 0);
 
@@ -1152,7 +1254,7 @@ static int wacom_intuos_bt_irq(struct wacom_wac *wacom, size_t len)
 	case 0x04:
 		wacom_intuos_bt_process_data(wacom, data + i);
 		i += 10;
-		/* fall through */
+		fallthrough;
 	case 0x03:
 		wacom_intuos_bt_process_data(wacom, data + i);
 		i += 10;
@@ -1206,9 +1308,13 @@ static void wacom_intuos_pro2_bt_pen(struct wacom_wac *wacom)
 
 	struct input_dev *pen_input = wacom->pen_input;
 	unsigned char *data = wacom->data;
+	int number_of_valid_frames = 0;
+	ktime_t time_interval = 15000000;
+	ktime_t time_packet_received = ktime_get();
 	int i;
 
-	if (wacom->features.type == INTUOSP2_BT) {
+	if (wacom->features.type == INTUOSP2_BT ||
+	    wacom->features.type == INTUOSP2S_BT) {
 		wacom->serial[0] = get_unaligned_le64(&data[99]);
 		wacom->id[0]     = get_unaligned_le16(&data[107]);
 		pen_frame_len = 14;
@@ -1224,22 +1330,63 @@ static void wacom_intuos_pro2_bt_pen(struct wacom_wac *wacom)
 		/* Add back in missing bits of ID for non-USI pens */
 		wacom->id[0] |= (wacom->serial[0] >> 32) & 0xFFFFF;
 	}
-	wacom->tool[0]   = wacom_intuos_get_tool_type(wacom_intuos_id_mangle(wacom->id[0]));
 
+	/* number of valid frames */
 	for (i = 0; i < pen_frames; i++) {
+		unsigned char *frame = &data[i*pen_frame_len + 1];
+		bool valid = frame[0] & 0x80;
+
+		if (valid)
+			number_of_valid_frames++;
+	}
+
+	if (number_of_valid_frames) {
+		if (wacom->hid_data.time_delayed)
+			time_interval = ktime_get() - wacom->hid_data.time_delayed;
+		time_interval = div_u64(time_interval, number_of_valid_frames);
+		wacom->hid_data.time_delayed = time_packet_received;
+	}
+
+	for (i = 0; i < number_of_valid_frames; i++) {
 		unsigned char *frame = &data[i*pen_frame_len + 1];
 		bool valid = frame[0] & 0x80;
 		bool prox = frame[0] & 0x40;
 		bool range = frame[0] & 0x20;
+		bool invert = frame[0] & 0x10;
+		int frames_number_reversed = number_of_valid_frames - i - 1;
+		ktime_t event_timestamp = time_packet_received - frames_number_reversed * time_interval;
 
 		if (!valid)
 			continue;
 
+		if (!prox) {
+			wacom->shared->stylus_in_proximity = false;
+			wacom_exit_report(wacom);
+			input_sync(pen_input);
+
+			wacom->tool[0] = 0;
+			wacom->id[0] = 0;
+			wacom->serial[0] = 0;
+			wacom->hid_data.time_delayed = 0;
+			return;
+		}
+
 		if (range) {
+			if (!wacom->tool[0]) { /* first in range */
+				/* Going into range select tool */
+				if (invert)
+					wacom->tool[0] = BTN_TOOL_RUBBER;
+				else if (wacom->id[0])
+					wacom->tool[0] = wacom_intuos_get_tool_type(wacom->id[0]);
+				else
+					wacom->tool[0] = BTN_TOOL_PEN;
+			}
+
 			input_report_abs(pen_input, ABS_X, get_unaligned_le16(&frame[1]));
 			input_report_abs(pen_input, ABS_Y, get_unaligned_le16(&frame[3]));
 
-			if (wacom->features.type == INTUOSP2_BT) {
+			if (wacom->features.type == INTUOSP2_BT ||
+			    wacom->features.type == INTUOSP2S_BT) {
 				/* Fix rotation alignment: userspace expects zero at left */
 				int16_t rotation =
 					(int16_t)get_unaligned_le16(&frame[9]);
@@ -1257,25 +1404,32 @@ static void wacom_intuos_pro2_bt_pen(struct wacom_wac *wacom)
 						 get_unaligned_le16(&frame[11]));
 			}
 		}
-		input_report_abs(pen_input, ABS_PRESSURE, get_unaligned_le16(&frame[5]));
-		if (wacom->features.type == INTUOSP2_BT) {
-			input_report_abs(pen_input, ABS_DISTANCE,
-					 range ? frame[13] : wacom->features.distance_max);
-		} else {
-			input_report_abs(pen_input, ABS_DISTANCE,
-					 range ? frame[7] : wacom->features.distance_max);
+
+		if (wacom->tool[0]) {
+			input_report_abs(pen_input, ABS_PRESSURE, get_unaligned_le16(&frame[5]));
+			if (wacom->features.type == INTUOSP2_BT ||
+			    wacom->features.type == INTUOSP2S_BT) {
+				input_report_abs(pen_input, ABS_DISTANCE,
+						 range ? frame[13] : wacom->features.distance_max);
+			} else {
+				input_report_abs(pen_input, ABS_DISTANCE,
+						 range ? frame[7] : wacom->features.distance_max);
+			}
+
+			input_report_key(pen_input, BTN_TOUCH, frame[0] & 0x09);
+			input_report_key(pen_input, BTN_STYLUS, frame[0] & 0x02);
+			input_report_key(pen_input, BTN_STYLUS2, frame[0] & 0x04);
+
+			input_report_key(pen_input, wacom->tool[0], prox);
+			input_event(pen_input, EV_MSC, MSC_SERIAL, wacom->serial[0]);
+			input_report_abs(pen_input, ABS_MISC,
+					 wacom_intuos_id_mangle(wacom->id[0])); /* report tool id */
 		}
 
-		input_report_key(pen_input, BTN_TOUCH, frame[0] & 0x01);
-		input_report_key(pen_input, BTN_STYLUS, frame[0] & 0x02);
-		input_report_key(pen_input, BTN_STYLUS2, frame[0] & 0x04);
-
-		input_report_key(pen_input, wacom->tool[0], prox);
-		input_event(pen_input, EV_MSC, MSC_SERIAL, wacom->serial[0]);
-		input_report_abs(pen_input, ABS_MISC,
-				 wacom_intuos_id_mangle(wacom->id[0])); /* report tool id */
-
 		wacom->shared->stylus_in_proximity = prox;
+
+		/* add timestamp to unpack the frames */
+		input_set_timestamp(pen_input, event_timestamp);
 
 		input_sync(pen_input);
 	}
@@ -1335,22 +1489,30 @@ static void wacom_intuos_pro2_bt_touch(struct wacom_wac *wacom)
 		if (wacom->num_contacts_left <= 0) {
 			wacom->num_contacts_left = 0;
 			wacom->shared->touch_down = wacom_wac_finger_count_touches(wacom);
+			input_sync(touch_input);
 		}
 	}
 
-	input_report_switch(touch_input, SW_MUTE_DEVICE, !(data[281] >> 7));
-	input_sync(touch_input);
+	if (wacom->num_contacts_left == 0) {
+		// Be careful that we don't accidentally call input_sync with
+		// only a partial set of fingers of processed
+		input_report_switch(touch_input, SW_MUTE_DEVICE, !(data[281] >> 7));
+		input_sync(touch_input);
+	}
+
 }
 
 static void wacom_intuos_pro2_bt_pad(struct wacom_wac *wacom)
 {
 	struct input_dev *pad_input = wacom->pad_input;
 	unsigned char *data = wacom->data;
+	int nbuttons = wacom->features.numbered_buttons;
 
-	int buttons = (data[282] << 1) | ((data[281] >> 6) & 0x01);
+	int expresskeys = data[282];
+	int center = (data[281] & 0x40) >> 6;
 	int ring = data[285] & 0x7F;
 	bool ringstatus = data[285] & 0x80;
-	bool prox = buttons || ringstatus;
+	bool prox = expresskeys || center || ringstatus;
 
 	/* Fix touchring data: userspace expects 0 at left and increasing clockwise */
 	ring = 71 - ring;
@@ -1358,7 +1520,8 @@ static void wacom_intuos_pro2_bt_pad(struct wacom_wac *wacom)
 	if (ring > 71)
 		ring -= 72;
 
-	wacom_report_numbered_buttons(pad_input, 9, buttons);
+	wacom_report_numbered_buttons(pad_input, nbuttons,
+                                      expresskeys | (center << (nbuttons - 1)));
 
 	input_report_abs(pad_input, ABS_WHEEL, ringstatus ? ring : 0);
 
@@ -1418,7 +1581,8 @@ static int wacom_intuos_pro2_bt_irq(struct wacom_wac *wacom, size_t len)
 	}
 
 	wacom_intuos_pro2_bt_pen(wacom);
-	if (wacom->features.type == INTUOSP2_BT) {
+	if (wacom->features.type == INTUOSP2_BT ||
+	    wacom->features.type == INTUOSP2S_BT) {
 		wacom_intuos_pro2_bt_touch(wacom);
 		wacom_intuos_pro2_bt_pad(wacom);
 		wacom_intuos_pro2_bt_battery(wacom);
@@ -1439,6 +1603,9 @@ static int wacom_24hdt_irq(struct wacom_wac *wacom)
 	int num_contacts_left = 4; /* maximum contacts per packet */
 	int byte_per_packet = WACOM_BYTES_PER_24HDT_PACKET;
 	int y_offset = 2;
+
+	if (touch_is_muted(wacom) && !wacom->shared->touch_down)
+		return 0;
 
 	if (wacom->features.type == WACOM_27QHDT) {
 		current_num_contacts = data[63];
@@ -1716,7 +1883,9 @@ int wacom_equivalent_usage(int usage)
 		    usage == WACOM_HID_WD_TOUCHSTRIP2 ||
 		    usage == WACOM_HID_WD_TOUCHRING ||
 		    usage == WACOM_HID_WD_TOUCHRINGSTATUS ||
-		    usage == WACOM_HID_WD_REPORT_VALID) {
+		    usage == WACOM_HID_WD_REPORT_VALID ||
+		    usage == WACOM_HID_WD_BARRELSWITCH3 ||
+		    usage == WACOM_HID_WD_SEQUENCENUMBER) {
 			return usage;
 		}
 
@@ -1729,6 +1898,9 @@ int wacom_equivalent_usage(int usage)
 	if ((usage & HID_USAGE_PAGE) == WACOM_HID_UP_WACOMTOUCH) {
 		int subpage = (usage & 0xFF00) << 8;
 		int subusage = (usage & 0xFF);
+
+		if (usage == WACOM_HID_WT_REPORT_VALID)
+			return usage;
 
 		if (subpage == HID_UP_UNDEFINED)
 			subpage = WACOM_HID_SP_DIGITIZER;
@@ -1749,6 +1921,7 @@ static void wacom_map_usage(struct input_dev *input, struct hid_usage *usage,
 	int fmax = field->logical_maximum;
 	unsigned int equivalent_usage = wacom_equivalent_usage(usage->hid);
 	int resolution_code = code;
+	int resolution = hidinput_calc_abs_res(field, resolution_code);
 
 	if (equivalent_usage == HID_DG_TWIST) {
 		resolution_code = ABS_RZ;
@@ -1766,22 +1939,23 @@ static void wacom_map_usage(struct input_dev *input, struct hid_usage *usage,
 	usage->type = type;
 	usage->code = code;
 
-	set_bit(type, input->evbit);
-
 	switch (type) {
 	case EV_ABS:
 		input_set_abs_params(input, code, fmin, fmax, fuzz, 0);
-		input_abs_set_res(input, code,
-				  hidinput_calc_abs_res(field, resolution_code));
+
+		/* older tablet may miss physical usage */
+		if ((code == ABS_X || code == ABS_Y) && !resolution) {
+			resolution = WACOM_INTUOS_RES;
+			hid_warn(input,
+				 "Wacom usage (%d) missing resolution \n",
+				 code);
+		}
+		input_abs_set_res(input, code, resolution);
 		break;
 	case EV_KEY:
-		input_set_capability(input, EV_KEY, code);
-		break;
 	case EV_MSC:
-		input_set_capability(input, EV_MSC, code);
-		break;
 	case EV_SW:
-		input_set_capability(input, EV_SW, code);
+		input_set_capability(input, type, code);
 		break;
 	}
 }
@@ -1789,18 +1963,7 @@ static void wacom_map_usage(struct input_dev *input, struct hid_usage *usage,
 static void wacom_wac_battery_usage_mapping(struct hid_device *hdev,
 		struct hid_field *field, struct hid_usage *usage)
 {
-	struct wacom *wacom = hid_get_drvdata(hdev);
-	struct wacom_wac *wacom_wac = &wacom->wacom_wac;
-	struct wacom_features *features = &wacom_wac->features;
-	unsigned equivalent_usage = wacom_equivalent_usage(usage->hid);
-
-	switch (equivalent_usage) {
-	case HID_DG_BATTERYSTRENGTH:
-	case WACOM_HID_WD_BATTERY_LEVEL:
-	case WACOM_HID_WD_BATTERY_CHARGING:
-		features->quirks |= WACOM_QUIRK_BATTERY;
-		break;
-	}
+	return;
 }
 
 static void wacom_wac_battery_event(struct hid_device *hdev, struct hid_field *field,
@@ -1821,18 +1984,21 @@ static void wacom_wac_battery_event(struct hid_device *hdev, struct hid_field *f
 			wacom_wac->hid_data.bat_connected = 1;
 			wacom_wac->hid_data.bat_status = WACOM_POWER_SUPPLY_STATUS_AUTO;
 		}
+		wacom_wac->features.quirks |= WACOM_QUIRK_BATTERY;
 		break;
 	case WACOM_HID_WD_BATTERY_LEVEL:
 		value = value * 100 / (field->logical_maximum - field->logical_minimum);
 		wacom_wac->hid_data.battery_capacity = value;
 		wacom_wac->hid_data.bat_connected = 1;
 		wacom_wac->hid_data.bat_status = WACOM_POWER_SUPPLY_STATUS_AUTO;
+		wacom_wac->features.quirks |= WACOM_QUIRK_BATTERY;
 		break;
 	case WACOM_HID_WD_BATTERY_CHARGING:
 		wacom_wac->hid_data.bat_charging = value;
 		wacom_wac->hid_data.ps_connected = value;
 		wacom_wac->hid_data.bat_connected = 1;
 		wacom_wac->hid_data.bat_status = WACOM_POWER_SUPPLY_STATUS_AUTO;
+		wacom_wac->features.quirks |= WACOM_QUIRK_BATTERY;
 		break;
 	}
 }
@@ -1848,18 +2014,15 @@ static void wacom_wac_battery_report(struct hid_device *hdev,
 {
 	struct wacom *wacom = hid_get_drvdata(hdev);
 	struct wacom_wac *wacom_wac = &wacom->wacom_wac;
-	struct wacom_features *features = &wacom_wac->features;
 
-	if (features->quirks & WACOM_QUIRK_BATTERY) {
-		int status = wacom_wac->hid_data.bat_status;
-		int capacity = wacom_wac->hid_data.battery_capacity;
-		bool charging = wacom_wac->hid_data.bat_charging;
-		bool connected = wacom_wac->hid_data.bat_connected;
-		bool powered = wacom_wac->hid_data.ps_connected;
+	int status = wacom_wac->hid_data.bat_status;
+	int capacity = wacom_wac->hid_data.battery_capacity;
+	bool charging = wacom_wac->hid_data.bat_charging;
+	bool connected = wacom_wac->hid_data.bat_connected;
+	bool powered = wacom_wac->hid_data.ps_connected;
 
-		wacom_notify_battery(wacom_wac, status, capacity, charging,
-				     connected, powered);
-	}
+	wacom_notify_battery(wacom_wac, status, capacity, charging,
+			     connected, powered);
 }
 
 static void wacom_wac_pad_usage_mapping(struct hid_device *hdev,
@@ -1888,8 +2051,6 @@ static void wacom_wac_pad_usage_mapping(struct hid_device *hdev,
 		features->device_type |= WACOM_DEVICETYPE_PAD;
 		break;
 	case WACOM_HID_WD_BUTTONCENTER:
-		wacom->generic_has_leds = true;
-		/* fall through */
 	case WACOM_HID_WD_BUTTONHOME:
 	case WACOM_HID_WD_BUTTONUP:
 	case WACOM_HID_WD_BUTTONDOWN:
@@ -1901,20 +2062,22 @@ static void wacom_wac_pad_usage_mapping(struct hid_device *hdev,
 		features->numbered_buttons++;
 		features->device_type |= WACOM_DEVICETYPE_PAD;
 		break;
-	case WACOM_HID_WD_TOUCHONOFF:
 	case WACOM_HID_WD_MUTE_DEVICE:
+		/* softkey touch switch */
+		wacom_wac->is_soft_touch_switch = true;
+		fallthrough;
+	case WACOM_HID_WD_TOUCHONOFF:
 		/*
-		 * This usage, which is used to mute touch events, comes
-		 * from the pad packet, but is reported on the touch
+		 * These two usages, which are used to mute touch events, come
+		 * from the pad packet, but are reported on the touch
 		 * interface. Because the touch interface may not have
 		 * been created yet, we cannot call wacom_map_usage(). In
-		 * order to process this usage when we receive it, we set
+		 * order to process the usages when we receive them, we set
 		 * the usage type and code directly.
 		 */
 		wacom_wac->has_mute_touch_switch = true;
 		usage->type = EV_SW;
 		usage->code = SW_MUTE_DEVICE;
-		features->device_type |= WACOM_DEVICETYPE_PAD;
 		break;
 	case WACOM_HID_WD_TOUCHSTRIP:
 		wacom_map_usage(input, usage, field, EV_ABS, ABS_RX, 0);
@@ -1994,37 +2157,12 @@ static void wacom_wac_pad_event(struct hid_device *hdev, struct hid_field *field
 			wacom_wac->hid_data.inrange_state |= value;
 	}
 
-	switch (equivalent_usage) {
-	case WACOM_HID_WD_TOUCHRING:
-		/*
-		 * Userspace expects touchrings to increase in value with
-		 * clockwise gestures and have their zero point at the
-		 * tablet's left. HID events "should" be clockwise-
-		 * increasing and zero at top, though the MobileStudio
-		 * Pro and 2nd-gen Intuos Pro don't do this...
-		 */
-		if (hdev->vendor == 0x56a &&
-		    (hdev->product == 0x34d || hdev->product == 0x34e ||  /* MobileStudio Pro */
-		     hdev->product == 0x357 || hdev->product == 0x358)) { /* Intuos Pro 2 */
-			value = (field->logical_maximum - value);
-
-			if (hdev->product == 0x357 || hdev->product == 0x358)
-				value = wacom_offset_rotation(input, usage, value, 3, 16);
-			else if (hdev->product == 0x34d || hdev->product == 0x34e)
-				value = wacom_offset_rotation(input, usage, value, 1, 2);
-		}
-		else {
-			value = wacom_offset_rotation(input, usage, value, 1, 4);
-		}
-		do_report = true;
-		break;
-	case WACOM_HID_WD_TOUCHRINGSTATUS:
-		if (!value)
-			input_event(input, usage->type, usage->code, 0);
-		break;
-
-	case WACOM_HID_WD_MUTE_DEVICE:
-	case WACOM_HID_WD_TOUCHONOFF:
+	/* Process touch switch state first since it is reported through touch interface,
+	 * which is indepentent of pad interface. In the case when there are no other pad
+	 * events, the pad interface will not even be created.
+	 */
+	if ((equivalent_usage == WACOM_HID_WD_MUTE_DEVICE) ||
+	   (equivalent_usage == WACOM_HID_WD_TOUCHONOFF)) {
 		if (wacom_wac->shared->touch_input) {
 			bool *is_touch_on = &wacom_wac->shared->is_touch_on;
 
@@ -2037,6 +2175,45 @@ static void wacom_wac_pad_event(struct hid_device *hdev, struct hid_field *field
 					    SW_MUTE_DEVICE, !(*is_touch_on));
 			input_sync(wacom_wac->shared->touch_input);
 		}
+		return;
+	}
+
+	if (!input)
+		return;
+
+	switch (equivalent_usage) {
+	case WACOM_HID_WD_TOUCHRING:
+		/*
+		 * Userspace expects touchrings to increase in value with
+		 * clockwise gestures and have their zero point at the
+		 * tablet's left. HID events "should" be clockwise-
+		 * increasing and zero at top, though the MobileStudio
+		 * Pro and 2nd-gen Intuos Pro don't do this...
+		 */
+		if (hdev->vendor == 0x56a &&
+		    (hdev->product == 0x34d || hdev->product == 0x34e ||  /* MobileStudio Pro */
+		     hdev->product == 0x357 || hdev->product == 0x358 ||  /* Intuos Pro 2 */
+		     hdev->product == 0x392 ||				  /* Intuos Pro 2 */
+		     hdev->product == 0x398 || hdev->product == 0x399 ||  /* MobileStudio Pro */
+		     hdev->product == 0x3AA)) {				  /* MobileStudio Pro */
+			value = (field->logical_maximum - value);
+
+			if (hdev->product == 0x357 || hdev->product == 0x358 ||
+			    hdev->product == 0x392)
+				value = wacom_offset_rotation(input, usage, value, 3, 16);
+			else if (hdev->product == 0x34d || hdev->product == 0x34e ||
+				 hdev->product == 0x398 || hdev->product == 0x399 ||
+				 hdev->product == 0x3AA)
+				value = wacom_offset_rotation(input, usage, value, 1, 2);
+		}
+		else {
+			value = wacom_offset_rotation(input, usage, value, 1, 4);
+		}
+		do_report = true;
+		break;
+	case WACOM_HID_WD_TOUCHRINGSTATUS:
+		if (!value)
+			input_event(input, usage->type, usage->code, 0);
 		break;
 
 	case WACOM_HID_WD_MODE_CHANGE:
@@ -2050,7 +2227,7 @@ static void wacom_wac_pad_event(struct hid_device *hdev, struct hid_field *field
 		for (i = 0; i < wacom->led.count; i++)
 			wacom_update_led(wacom, features->numbered_buttons,
 					 value, i);
-		 /* fall through*/
+		fallthrough;
 	default:
 		do_report = true;
 		break;
@@ -2081,14 +2258,27 @@ static void wacom_wac_pad_report(struct hid_device *hdev,
 	bool active = wacom_wac->hid_data.inrange_state != 0;
 
 	/* report prox for expresskey events */
-	if ((wacom_equivalent_usage(field->physical) == HID_DG_TABLETFUNCTIONKEY) &&
-	    wacom_wac->hid_data.pad_input_event_flag) {
+	if (wacom_wac->hid_data.pad_input_event_flag) {
 		input_event(input, EV_ABS, ABS_MISC, active ? PAD_DEVICE_ID : 0);
 		input_sync(input);
 		if (!active)
 			wacom_wac->hid_data.pad_input_event_flag = false;
 	}
+}
 
+static void wacom_set_barrel_switch3_usage(struct wacom_wac *wacom_wac)
+{
+	struct input_dev *input = wacom_wac->pen_input;
+	struct wacom_features *features = &wacom_wac->features;
+
+	if (!(features->quirks & WACOM_QUIRK_AESPEN) &&
+	    wacom_wac->hid_data.barrelswitch &&
+	    wacom_wac->hid_data.barrelswitch2 &&
+	    wacom_wac->hid_data.serialhi &&
+	    !wacom_wac->hid_data.barrelswitch3) {
+		input_set_capability(input, EV_KEY, BTN_STYLUS3);
+		features->quirks |= WACOM_QUIRK_PEN_BUTTON3;
+	}
 }
 
 static void wacom_wac_pen_usage_mapping(struct hid_device *hdev,
@@ -2131,62 +2321,47 @@ static void wacom_wac_pen_usage_mapping(struct hid_device *hdev,
 		wacom_map_usage(input, usage, field, EV_ABS, ABS_Z, 0);
 		break;
 	case HID_DG_ERASER:
+		input_set_capability(input, EV_KEY, BTN_TOOL_RUBBER);
+		wacom_map_usage(input, usage, field, EV_KEY, BTN_TOUCH, 0);
+		break;
 	case HID_DG_TIPSWITCH:
+		input_set_capability(input, EV_KEY, BTN_TOOL_PEN);
 		wacom_map_usage(input, usage, field, EV_KEY, BTN_TOUCH, 0);
 		break;
 	case HID_DG_BARRELSWITCH:
+		wacom_wac->hid_data.barrelswitch = true;
+		wacom_set_barrel_switch3_usage(wacom_wac);
 		wacom_map_usage(input, usage, field, EV_KEY, BTN_STYLUS, 0);
 		break;
 	case HID_DG_BARRELSWITCH2:
+		wacom_wac->hid_data.barrelswitch2 = true;
+		wacom_set_barrel_switch3_usage(wacom_wac);
 		wacom_map_usage(input, usage, field, EV_KEY, BTN_STYLUS2, 0);
 		break;
 	case HID_DG_TOOLSERIALNUMBER:
 		features->quirks |= WACOM_QUIRK_TOOLSERIAL;
 		wacom_map_usage(input, usage, field, EV_MSC, MSC_SERIAL, 0);
-
-		/* Adjust AES usages to match modern convention */
-		if (usage->hid == WACOM_HID_WT_SERIALNUMBER && field->report_size == 16) {
-			if (field->index + 2 < field->report->maxfield) {
-				struct hid_field *a = field->report->field[field->index + 1];
-				struct hid_field *b = field->report->field[field->index + 2];
-
-				if (a->maxusage > 0 && a->usage[0].hid == HID_DG_TOOLSERIALNUMBER && a->report_size == 32 &&
-				    b->maxusage > 0 && b->usage[0].hid == 0xFF000000 && b->report_size == 8) {
-					features->quirks |= WACOM_QUIRK_AESPEN;
-					usage->hid = WACOM_HID_WD_TOOLTYPE;
-					field->logical_minimum = S16_MIN;
-					field->logical_maximum = S16_MAX;
-					a->logical_minimum = S32_MIN;
-					a->logical_maximum = S32_MAX;
-					b->usage[0].hid = WACOM_HID_WD_SERIALHI;
-					b->logical_minimum = 0;
-					b->logical_maximum = U8_MAX;
-				}
-			}
-		}
+		break;
+	case HID_DG_SCANTIME:
+		wacom_map_usage(input, usage, field, EV_MSC, MSC_TIMESTAMP, 0);
 		break;
 	case WACOM_HID_WD_SENSE:
 		features->quirks |= WACOM_QUIRK_SENSE;
 		wacom_map_usage(input, usage, field, EV_KEY, BTN_TOOL_PEN, 0);
 		break;
 	case WACOM_HID_WD_SERIALHI:
+		wacom_wac->hid_data.serialhi = true;
+		wacom_set_barrel_switch3_usage(wacom_wac);
 		wacom_map_usage(input, usage, field, EV_ABS, ABS_MISC, 0);
-
-		if (!(features->quirks & WACOM_QUIRK_AESPEN)) {
-			set_bit(EV_KEY, input->evbit);
-			input_set_capability(input, EV_KEY, BTN_TOOL_PEN);
-			input_set_capability(input, EV_KEY, BTN_TOOL_RUBBER);
-			input_set_capability(input, EV_KEY, BTN_TOOL_BRUSH);
-			input_set_capability(input, EV_KEY, BTN_TOOL_PENCIL);
-			input_set_capability(input, EV_KEY, BTN_TOOL_AIRBRUSH);
-			if (!(features->device_type & WACOM_DEVICETYPE_DIRECT)) {
-				input_set_capability(input, EV_KEY, BTN_TOOL_MOUSE);
-				input_set_capability(input, EV_KEY, BTN_TOOL_LENS);
-			}
-		}
 		break;
 	case WACOM_HID_WD_FINGERWHEEL:
+		input_set_capability(input, EV_KEY, BTN_TOOL_AIRBRUSH);
 		wacom_map_usage(input, usage, field, EV_ABS, ABS_WHEEL, 0);
+		break;
+	case WACOM_HID_WD_BARRELSWITCH3:
+		wacom_wac->hid_data.barrelswitch3 = true;
+		wacom_map_usage(input, usage, field, EV_KEY, BTN_STYLUS3, 0);
+		features->quirks &= ~WACOM_QUIRK_PEN_BUTTON3;
 		break;
 	}
 }
@@ -2213,6 +2388,7 @@ static void wacom_wac_pen_event(struct hid_device *hdev, struct hid_field *field
 		value = field->logical_maximum - value;
 		break;
 	case HID_DG_INRANGE:
+		mod_timer(&wacom->idleprox_timer, jiffies + msecs_to_jiffies(100));
 		wacom_wac->hid_data.inrange_state = value;
 		if (!(features->quirks & WACOM_QUIRK_SENSE))
 			wacom_wac->hid_data.sense_state = value;
@@ -2233,10 +2409,13 @@ static void wacom_wac_pen_event(struct hid_device *hdev, struct hid_field *field
 	case HID_DG_TOOLSERIALNUMBER:
 		if (value) {
 			wacom_wac->serial[0] = (wacom_wac->serial[0] & ~0xFFFFFFFFULL);
-			wacom_wac->serial[0] |= (__u32)value;
+			wacom_wac->serial[0] |= wacom_s32tou(value, field->report_size);
 		}
 		return;
 	case HID_DG_TWIST:
+		/* don't modify the value if the pen doesn't support the feature */
+		if (!wacom_is_art_pen(wacom_wac->id[0])) return;
+
 		/*
 		 * Userspace expects pen twist to have its zero point when
 		 * the buttons/finger is on the tablet's left. HID values
@@ -2249,15 +2428,17 @@ static void wacom_wac_pen_event(struct hid_device *hdev, struct hid_field *field
 		return;
 	case WACOM_HID_WD_SERIALHI:
 		if (value) {
+			__u32 raw_value = wacom_s32tou(value, field->report_size);
+
 			wacom_wac->serial[0] = (wacom_wac->serial[0] & 0xFFFFFFFF);
-			wacom_wac->serial[0] |= ((__u64)value) << 32;
+			wacom_wac->serial[0] |= ((__u64)raw_value) << 32;
 			/*
 			 * Non-USI EMR devices may contain additional tool type
 			 * information here. See WACOM_HID_WD_TOOLTYPE case for
 			 * more details.
 			 */
 			if (value >> 20 == 1) {
-				wacom_wac->id[0] |= value & 0xFFFFF;
+				wacom_wac->id[0] |= raw_value & 0xFFFFF;
 			}
 		}
 		return;
@@ -2269,7 +2450,7 @@ static void wacom_wac_pen_event(struct hid_device *hdev, struct hid_field *field
 		 * bitwise OR so the complete value can be built
 		 * up over time :(
 		 */
-		wacom_wac->id[0] |= value;
+		wacom_wac->id[0] |= wacom_s32tou(value, field->report_size);
 		return;
 	case WACOM_HID_WD_OFFSETLEFT:
 		if (features->offset_left && value != features->offset_left)
@@ -2301,6 +2482,14 @@ static void wacom_wac_pen_event(struct hid_device *hdev, struct hid_field *field
 		return;
 	case WACOM_HID_WD_REPORT_VALID:
 		wacom_wac->is_invalid_bt_frame = !value;
+		return;
+	case WACOM_HID_WD_BARRELSWITCH3:
+		wacom_wac->hid_data.barrelswitch3 = value;
+		return;
+	case WACOM_HID_WD_SEQUENCENUMBER:
+		if (wacom_wac->hid_data.sequence_number != value)
+			hid_warn(hdev, "Dropped %hu packets", (unsigned short)(value - wacom_wac->hid_data.sequence_number));
+		wacom_wac->hid_data.sequence_number = value + 1;
 		return;
 	}
 
@@ -2354,12 +2543,16 @@ static void wacom_wac_pen_report(struct hid_device *hdev,
 
 	if (!delay_pen_events(wacom_wac) && wacom_wac->tool[0]) {
 		int id = wacom_wac->id[0];
-		int sw_state = wacom_wac->hid_data.barrelswitch |
-			       (wacom_wac->hid_data.barrelswitch2 << 1);
-
-		input_report_key(input, BTN_STYLUS, sw_state == 1);
-		input_report_key(input, BTN_STYLUS2, sw_state == 2);
-		input_report_key(input, BTN_STYLUS3, sw_state == 3);
+		if (wacom_wac->features.quirks & WACOM_QUIRK_PEN_BUTTON3) {
+			int sw_state = wacom_wac->hid_data.barrelswitch |
+				       (wacom_wac->hid_data.barrelswitch2 << 1);
+			wacom_wac->hid_data.barrelswitch = sw_state == 1;
+			wacom_wac->hid_data.barrelswitch2 = sw_state == 2;
+			wacom_wac->hid_data.barrelswitch3 = sw_state == 3;
+		}
+		input_report_key(input, BTN_STYLUS, wacom_wac->hid_data.barrelswitch);
+		input_report_key(input, BTN_STYLUS2, wacom_wac->hid_data.barrelswitch2);
+		input_report_key(input, BTN_STYLUS3, wacom_wac->hid_data.barrelswitch3);
 
 		/*
 		 * Non-USI EMR tools should have their IDs mangled to
@@ -2441,6 +2634,9 @@ static void wacom_wac_finger_usage_mapping(struct hid_device *hdev,
 			field->logical_maximum = 255;
 		}
 		break;
+	case HID_DG_SCANTIME:
+		wacom_map_usage(input, usage, field, EV_MSC, MSC_TIMESTAMP, 0);
+		break;
 	}
 }
 
@@ -2452,11 +2648,10 @@ static void wacom_wac_finger_slot(struct wacom_wac *wacom_wac,
 	bool prox = hid_data->tipswitch &&
 		    report_touch_events(wacom_wac);
 
-	if (wacom_wac->shared->has_mute_touch_switch &&
-	    !wacom_wac->shared->is_touch_on) {
+	if (touch_is_muted(wacom_wac)) {
 		if (!wacom_wac->shared->touch_down)
 			return;
-		prox = 0;
+		prox = false;
 	}
 
 	wacom_wac->hid_data.num_received++;
@@ -2467,6 +2662,18 @@ static void wacom_wac_finger_slot(struct wacom_wac *wacom_wac,
 		int slot;
 
 		slot = input_mt_get_slot_by_key(input, hid_data->id);
+		if (slot < 0) {
+			return;
+		} else {
+			struct input_mt_slot *ps = &input->mt->slots[slot];
+			int mt_id = input_mt_get_value(ps, ABS_MT_TRACKING_ID);
+
+			if (!prox && mt_id < 0) {
+				// No data to send for this slot; short-circuit
+				return;
+			}
+		}
+
 		input_mt_slot(input, slot);
 		input_mt_report_slot_state(input, MT_TOOL_FINGER, prox);
 	}
@@ -2489,14 +2696,42 @@ static void wacom_wac_finger_slot(struct wacom_wac *wacom_wac,
 	}
 }
 
+static bool wacom_wac_slot_is_active(struct input_dev *dev, int key)
+{
+	struct input_mt *mt = dev->mt;
+	struct input_mt_slot *s;
+
+	if (!mt)
+		return false;
+
+	for (s = mt->slots; s != mt->slots + mt->num_slots; s++) {
+		if (s->key == key &&
+			input_mt_get_value(s, ABS_MT_TRACKING_ID) >= 0) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 static void wacom_wac_finger_event(struct hid_device *hdev,
 		struct hid_field *field, struct hid_usage *usage, __s32 value)
 {
 	struct wacom *wacom = hid_get_drvdata(hdev);
 	struct wacom_wac *wacom_wac = &wacom->wacom_wac;
 	unsigned equivalent_usage = wacom_equivalent_usage(usage->hid);
+	struct wacom_features *features = &wacom->wacom_wac.features;
+
+	if (touch_is_muted(wacom_wac) && !wacom_wac->shared->touch_down)
+		return;
+
+	if (wacom_wac->is_invalid_bt_frame)
+		return;
 
 	switch (equivalent_usage) {
+	case HID_DG_CONFIDENCE:
+		wacom_wac->hid_data.confidence = value;
+		break;
 	case HID_GD_X:
 		wacom_wac->hid_data.x = value;
 		break;
@@ -2515,12 +2750,28 @@ static void wacom_wac_finger_event(struct hid_device *hdev,
 	case HID_DG_TIPSWITCH:
 		wacom_wac->hid_data.tipswitch = value;
 		break;
+	case WACOM_HID_WT_REPORT_VALID:
+		wacom_wac->is_invalid_bt_frame = !value;
+		return;
+	case HID_DG_CONTACTMAX:
+		if (!features->touch_max) {
+			features->touch_max = value;
+		} else {
+			hid_warn(hdev, "%s: ignoring attempt to overwrite non-zero touch_max "
+				 "%d -> %d\n", __func__, features->touch_max, value);
+		}
+		return;
 	}
 
-
 	if (usage->usage_index + 1 == field->report_count) {
-		if (equivalent_usage == wacom_wac->hid_data.last_slot_field)
-			wacom_wac_finger_slot(wacom_wac, wacom_wac->touch_input);
+		if (equivalent_usage == wacom_wac->hid_data.last_slot_field) {
+			bool touch_removed = wacom_wac_slot_is_active(wacom_wac->touch_input,
+				wacom_wac->hid_data.id) && !wacom_wac->hid_data.tipswitch;
+
+			if (wacom_wac->hid_data.confidence || touch_removed) {
+				wacom_wac_finger_slot(wacom_wac, wacom_wac->touch_input);
+			}
+		}
 	}
 }
 
@@ -2531,6 +2782,17 @@ static void wacom_wac_finger_pre_report(struct hid_device *hdev,
 	struct wacom_wac *wacom_wac = &wacom->wacom_wac;
 	struct hid_data* hid_data = &wacom_wac->hid_data;
 	int i;
+
+	if (touch_is_muted(wacom_wac) && !wacom_wac->shared->touch_down)
+		return;
+
+	wacom_wac->is_invalid_bt_frame = false;
+
+	hid_data->confidence = true;
+
+	hid_data->cc_report = 0;
+	hid_data->cc_index = -1;
+	hid_data->cc_value_index = -1;
 
 	for (i = 0; i < report->maxfield; i++) {
 		struct hid_field *field = report->field[i];
@@ -2565,11 +2827,14 @@ static void wacom_wac_finger_pre_report(struct hid_device *hdev,
 	    hid_data->cc_index >= 0) {
 		struct hid_field *field = report->field[hid_data->cc_index];
 		int value = field->value[hid_data->cc_value_index];
-		if (value)
+		if (value) {
 			hid_data->num_expected = value;
+			hid_data->num_received = 0;
+		}
 	}
 	else {
 		hid_data->num_expected = wacom_wac->features.touch_max;
+		hid_data->num_received = 0;
 	}
 }
 
@@ -2580,6 +2845,10 @@ static void wacom_wac_finger_report(struct hid_device *hdev,
 	struct wacom_wac *wacom_wac = &wacom->wacom_wac;
 	struct input_dev *input = wacom_wac->touch_input;
 	unsigned touch_max = wacom_wac->features.touch_max;
+
+	/* if there was nothing to process, don't send an empty sync */
+	if (wacom_wac->hid_data.num_expected == 0)
+		return;
 
 	/* If more packets of data are expected, give us a chance to
 	 * process them rather than immediately syncing a partial
@@ -2593,6 +2862,7 @@ static void wacom_wac_finger_report(struct hid_device *hdev,
 
 	input_sync(input);
 	wacom_wac->hid_data.num_received = 0;
+	wacom_wac->hid_data.num_expected = 0;
 
 	/* keep touch state for pen event */
 	wacom_wac->shared->touch_down = wacom_wac_finger_count_touches(wacom_wac);
@@ -2633,7 +2903,7 @@ void wacom_wac_event(struct hid_device *hdev, struct hid_field *field,
 	/* usage tests must precede field tests */
 	if (WACOM_BATTERY_USAGE(usage))
 		wacom_wac_battery_event(hdev, field, usage, value);
-	else if (WACOM_PAD_FIELD(field) && wacom->wacom_wac.pad_input)
+	else if (WACOM_PAD_FIELD(field))
 		wacom_wac_pad_event(hdev, field, usage, value);
 	else if (WACOM_PEN_FIELD(field) && wacom->wacom_wac.pen_input)
 		wacom_wac_pen_event(hdev, field, usage, value);
@@ -2685,8 +2955,8 @@ static int wacom_wac_collection(struct hid_device *hdev, struct hid_report *repo
 	if (report->type != HID_INPUT_REPORT)
 		return -1;
 
-	if (WACOM_PAD_FIELD(field) && wacom->wacom_wac.pad_input)
-		wacom_wac_pad_report(hdev, report, field);
+	if (WACOM_PAD_FIELD(field))
+		return 0;
 	else if (WACOM_PEN_FIELD(field) && wacom->wacom_wac.pen_input)
 		wacom_wac_pen_report(hdev, report);
 	else if (WACOM_FINGER_FIELD(field) && wacom->wacom_wac.touch_input)
@@ -2701,7 +2971,7 @@ void wacom_wac_report(struct hid_device *hdev, struct hid_report *report)
 	struct wacom_wac *wacom_wac = &wacom->wacom_wac;
 	struct hid_field *field;
 	bool pad_in_hid_field = false, pen_in_hid_field = false,
-		finger_in_hid_field = false;
+		finger_in_hid_field = false, true_pad = false;
 	int r;
 	int prev_collection = -1;
 
@@ -2717,6 +2987,8 @@ void wacom_wac_report(struct hid_device *hdev, struct hid_report *report)
 			pen_in_hid_field = true;
 		if (WACOM_FINGER_FIELD(field))
 			finger_in_hid_field = true;
+		if (wacom_equivalent_usage(field->physical) == HID_DG_TABLETFUNCTIONKEY)
+			true_pad = true;
 	}
 
 	wacom_wac_battery_pre_report(hdev, report);
@@ -2740,6 +3012,9 @@ void wacom_wac_report(struct hid_device *hdev, struct hid_report *report)
 	}
 
 	wacom_wac_battery_report(hdev, report);
+
+	if (true_pad && wacom->wacom_wac.pad_input)
+		wacom_wac_pad_report(hdev, report, field);
 }
 
 static int wacom_bpt_touch(struct wacom_wac *wacom)
@@ -2878,24 +3153,31 @@ static int wacom_bpt_pen(struct wacom_wac *wacom)
 	struct wacom_features *features = &wacom->features;
 	struct input_dev *input = wacom->pen_input;
 	unsigned char *data = wacom->data;
-	int prox = 0, x = 0, y = 0, p = 0, d = 0, pen = 0, btn1 = 0, btn2 = 0;
+	int x = 0, y = 0, p = 0, d = 0;
+	bool pen = false, btn1 = false, btn2 = false;
+	bool range, prox, rdy;
 
 	if (data[0] != WACOM_REPORT_PENABLED)
 	    return 0;
 
-	prox = (data[1] & 0x20) == 0x20;
+	range = (data[1] & 0x80) == 0x80;
+	prox = (data[1] & 0x40) == 0x40;
+	rdy = (data[1] & 0x20) == 0x20;
 
-	/*
-	 * All reports shared between PEN and RUBBER tool must be
-	 * forced to a known starting value (zero) when transitioning to
-	 * out-of-prox.
-	 *
-	 * If not reset then, to userspace, it will look like lost events
-	 * if new tool comes in-prox with same values as previous tool sent.
-	 *
-	 * Hardware does report zero in most out-of-prox cases but not all.
-	 */
-	if (!wacom->shared->stylus_in_proximity) {
+	wacom->shared->stylus_in_proximity = range;
+	if (delay_pen_events(wacom))
+		return 0;
+
+	if (rdy) {
+		p = le16_to_cpup((__le16 *)&data[6]);
+		pen = data[1] & 0x01;
+		btn1 = data[1] & 0x02;
+		btn2 = data[1] & 0x04;
+	}
+	if (prox) {
+		x = le16_to_cpup((__le16 *)&data[2]);
+		y = le16_to_cpup((__le16 *)&data[4]);
+
 		if (data[1] & 0x08) {
 			wacom->tool[0] = BTN_TOOL_RUBBER;
 			wacom->id[0] = ERASER_DEVICE_ID;
@@ -2903,16 +3185,9 @@ static int wacom_bpt_pen(struct wacom_wac *wacom)
 			wacom->tool[0] = BTN_TOOL_PEN;
 			wacom->id[0] = STYLUS_DEVICE_ID;
 		}
+		wacom->reporting_data = true;
 	}
-
-	wacom->shared->stylus_in_proximity = prox;
-	if (delay_pen_events(wacom))
-		return 0;
-
-	if (prox) {
-		x = le16_to_cpup((__le16 *)&data[2]);
-		y = le16_to_cpup((__le16 *)&data[4]);
-		p = le16_to_cpup((__le16 *)&data[6]);
+	if (range) {
 		/*
 		 * Convert distance from out prox to distance from tablet.
 		 * distance will be greater than distance_max once
@@ -2921,25 +3196,29 @@ static int wacom_bpt_pen(struct wacom_wac *wacom)
 		 */
 		if (data[8] <= features->distance_max)
 			d = features->distance_max - data[8];
-
-		pen = data[1] & 0x01;
-		btn1 = data[1] & 0x02;
-		btn2 = data[1] & 0x04;
 	} else {
 		wacom->id[0] = 0;
 	}
 
-	input_report_key(input, BTN_TOUCH, pen);
-	input_report_key(input, BTN_STYLUS, btn1);
-	input_report_key(input, BTN_STYLUS2, btn2);
+	if (wacom->reporting_data) {
+		input_report_key(input, BTN_TOUCH, pen);
+		input_report_key(input, BTN_STYLUS, btn1);
+		input_report_key(input, BTN_STYLUS2, btn2);
 
-	input_report_abs(input, ABS_X, x);
-	input_report_abs(input, ABS_Y, y);
-	input_report_abs(input, ABS_PRESSURE, p);
-	input_report_abs(input, ABS_DISTANCE, d);
+		if (prox || !range) {
+			input_report_abs(input, ABS_X, x);
+			input_report_abs(input, ABS_Y, y);
+		}
+		input_report_abs(input, ABS_PRESSURE, p);
+		input_report_abs(input, ABS_DISTANCE, d);
 
-	input_report_key(input, wacom->tool[0], prox); /* PEN or RUBBER */
-	input_report_abs(input, ABS_MISC, wacom->id[0]); /* TOOL ID */
+		input_report_key(input, wacom->tool[0], range); /* PEN or RUBBER */
+		input_report_abs(input, ABS_MISC, wacom->id[0]); /* TOOL ID */
+	}
+
+	if (!range) {
+		wacom->reporting_data = false;
+	}
 
 	return 1;
 }
@@ -3204,6 +3483,7 @@ void wacom_wac_irq(struct wacom_wac *wacom_wac, size_t len)
 		break;
 
 	case INTUOSP2_BT:
+	case INTUOSP2S_BT:
 	case INTUOSHT3_BT:
 		sync = wacom_intuos_pro2_bt_irq(wacom_wac, len);
 		break;
@@ -3315,6 +3595,7 @@ static void wacom_setup_intuos(struct wacom_wac *wacom_wac)
 
 void wacom_setup_device_quirks(struct wacom *wacom)
 {
+	struct wacom_wac *wacom_wac = &wacom->wacom_wac;
 	struct wacom_features *features = &wacom->wacom_wac.features;
 
 	/* The pen and pad share the same interface on most devices */
@@ -3345,8 +3626,14 @@ void wacom_setup_device_quirks(struct wacom *wacom)
 			if (features->type >= INTUOSHT && features->type <= BAMBOO_PT)
 				features->device_type |= WACOM_DEVICETYPE_PAD;
 
-			features->x_max = 4096;
-			features->y_max = 4096;
+			if (features->type == INTUOSHT2) {
+				features->x_max = features->x_max / 10;
+				features->y_max = features->y_max / 10;
+			}
+			else {
+				features->x_max = 4096;
+				features->y_max = 4096;
+			}
 		}
 		else if (features->pktlen == WACOM_PKGLEN_BBTOUCH) {
 			features->device_type |= WACOM_DEVICETYPE_PAD;
@@ -3377,7 +3664,8 @@ void wacom_setup_device_quirks(struct wacom *wacom)
 	if (features->type == REMOTE)
 		features->device_type = WACOM_DEVICETYPE_PAD;
 
-	if (features->type == INTUOSP2_BT) {
+	if (features->type == INTUOSP2_BT ||
+	    features->type == INTUOSP2S_BT) {
 		features->device_type |= WACOM_DEVICETYPE_PEN |
 					 WACOM_DEVICETYPE_PAD |
 					 WACOM_DEVICETYPE_TOUCH;
@@ -3438,14 +3726,30 @@ void wacom_setup_device_quirks(struct wacom *wacom)
 
 	if (features->type == REMOTE)
 		features->device_type |= WACOM_DEVICETYPE_WL_MONITOR;
+
+	/* HID descriptor for DTK-2451 / DTH-2452 claims to report lots
+	 * of things it shouldn't. Lets fix up the damage...
+	 */
+	if (wacom->hdev->product == 0x382 || wacom->hdev->product == 0x37d) {
+		features->quirks &= ~WACOM_QUIRK_TOOLSERIAL;
+		__clear_bit(BTN_TOOL_BRUSH, wacom_wac->pen_input->keybit);
+		__clear_bit(BTN_TOOL_PENCIL, wacom_wac->pen_input->keybit);
+		__clear_bit(BTN_TOOL_AIRBRUSH, wacom_wac->pen_input->keybit);
+		__clear_bit(ABS_Z, wacom_wac->pen_input->absbit);
+		__clear_bit(ABS_DISTANCE, wacom_wac->pen_input->absbit);
+		__clear_bit(ABS_TILT_X, wacom_wac->pen_input->absbit);
+		__clear_bit(ABS_TILT_Y, wacom_wac->pen_input->absbit);
+		__clear_bit(ABS_WHEEL, wacom_wac->pen_input->absbit);
+		__clear_bit(ABS_MISC, wacom_wac->pen_input->absbit);
+		__clear_bit(MSC_SERIAL, wacom_wac->pen_input->mscbit);
+		__clear_bit(EV_MSC, wacom_wac->pen_input->evbit);
+	}
 }
 
 int wacom_setup_pen_input_capabilities(struct input_dev *input_dev,
 				   struct wacom_wac *wacom_wac)
 {
 	struct wacom_features *features = &wacom_wac->features;
-
-	input_dev->evbit[0] |= BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
 
 	if (!(features->device_type & WACOM_DEVICETYPE_PEN))
 		return -ENODEV;
@@ -3455,12 +3759,11 @@ int wacom_setup_pen_input_capabilities(struct input_dev *input_dev,
 	else
 		__set_bit(INPUT_PROP_POINTER, input_dev->propbit);
 
-	if (features->type == HID_GENERIC) {
-		/* setup has already been done; apply otherwise-undetectible quirks */
-		input_set_capability(input_dev, EV_KEY, BTN_STYLUS3);
+	if (features->type == HID_GENERIC)
+		/* setup has already been done */
 		return 0;
-	}
 
+	input_dev->evbit[0] |= BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
 	__set_bit(BTN_TOUCH, input_dev->keybit);
 	__set_bit(ABS_MISC, input_dev->absbit);
 
@@ -3480,13 +3783,14 @@ int wacom_setup_pen_input_capabilities(struct input_dev *input_dev,
 	switch (features->type) {
 	case GRAPHIRE_BT:
 		__clear_bit(ABS_MISC, input_dev->absbit);
+		fallthrough;
 
 	case WACOM_MO:
 	case WACOM_G4:
 		input_set_abs_params(input_dev, ABS_DISTANCE, 0,
 					      features->distance_max,
 					      features->distance_fuzz, 0);
-		/* fall through */
+		fallthrough;
 
 	case GRAPHIRE:
 		input_set_capability(input_dev, EV_REL, REL_WHEEL);
@@ -3526,7 +3830,7 @@ int wacom_setup_pen_input_capabilities(struct input_dev *input_dev,
 	case INTUOS4S:
 		input_set_abs_params(input_dev, ABS_Z, -900, 899, 0, 0);
 		input_abs_set_res(input_dev, ABS_Z, 287);
-		/* fall through */
+		fallthrough;
 
 	case INTUOS:
 		wacom_setup_intuos(wacom_wac);
@@ -3539,6 +3843,7 @@ int wacom_setup_pen_input_capabilities(struct input_dev *input_dev,
 	case INTUOS5S:
 	case INTUOSPS:
 	case INTUOSP2_BT:
+	case INTUOSP2S_BT:
 		input_set_abs_params(input_dev, ABS_DISTANCE, 0,
 				      features->distance_max,
 				      features->distance_fuzz, 0);
@@ -3558,7 +3863,7 @@ int wacom_setup_pen_input_capabilities(struct input_dev *input_dev,
 	case TABLETPC:
 	case TABLETPCE:
 		__clear_bit(ABS_MISC, input_dev->absbit);
-		/* fall through */
+		fallthrough;
 
 	case DTUS:
 	case DTUSX:
@@ -3572,7 +3877,7 @@ int wacom_setup_pen_input_capabilities(struct input_dev *input_dev,
 
 	case PTU:
 		__set_bit(BTN_STYLUS2, input_dev->keybit);
-		/* fall through */
+		fallthrough;
 
 	case PENPARTNER:
 		__set_bit(BTN_TOOL_PEN, input_dev->keybit);
@@ -3611,8 +3916,6 @@ int wacom_setup_touch_input_capabilities(struct input_dev *input_dev,
 {
 	struct wacom_features *features = &wacom_wac->features;
 
-	input_dev->evbit[0] |= BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
-
 	if (!(features->device_type & WACOM_DEVICETYPE_TOUCH))
 		return -ENODEV;
 
@@ -3625,6 +3928,7 @@ int wacom_setup_touch_input_capabilities(struct input_dev *input_dev,
 		/* setup has already been done */
 		return 0;
 
+	input_dev->evbit[0] |= BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
 	__set_bit(BTN_TOUCH, input_dev->keybit);
 
 	if (features->touch_max == 1) {
@@ -3650,6 +3954,7 @@ int wacom_setup_touch_input_capabilities(struct input_dev *input_dev,
 
 	switch (features->type) {
 	case INTUOSP2_BT:
+	case INTUOSP2S_BT:
 		input_dev->evbit[0] |= BIT_MASK(EV_SW);
 		__set_bit(SW_MUTE_DEVICE, input_dev->swbit);
 
@@ -3665,10 +3970,16 @@ int wacom_setup_touch_input_capabilities(struct input_dev *input_dev,
 			input_set_abs_params(input_dev, ABS_MT_POSITION_Y,
 					     0, 5920, 4, 0);
 		}
+		else if (wacom_wac->shared->touch->product == 0x393) {
+			input_set_abs_params(input_dev, ABS_MT_POSITION_X,
+					     0, 6400, 4, 0);
+			input_set_abs_params(input_dev, ABS_MT_POSITION_Y,
+					     0, 4000, 4, 0);
+		}
 		input_abs_set_res(input_dev, ABS_MT_POSITION_X, 40);
-		input_abs_set_res(input_dev, ABS_MT_POSITION_X, 40);
+		input_abs_set_res(input_dev, ABS_MT_POSITION_Y, 40);
 
-		/* fall through */
+		fallthrough;
 
 	case INTUOS5:
 	case INTUOS5L:
@@ -3686,15 +3997,24 @@ int wacom_setup_touch_input_capabilities(struct input_dev *input_dev,
 		input_set_abs_params(input_dev, ABS_MT_WIDTH_MAJOR, 0, features->x_max, 0, 0);
 		input_set_abs_params(input_dev, ABS_MT_WIDTH_MINOR, 0, features->y_max, 0, 0);
 		input_set_abs_params(input_dev, ABS_MT_ORIENTATION, 0, 1, 0, 0);
-		/* fall through */
+		fallthrough;
 
 	case WACOM_27QHDT:
+		if (wacom_wac->shared->touch->product == 0x32C ||
+		    wacom_wac->shared->touch->product == 0xF6) {
+			input_dev->evbit[0] |= BIT_MASK(EV_SW);
+			__set_bit(SW_MUTE_DEVICE, input_dev->swbit);
+			wacom_wac->has_mute_touch_switch = true;
+			wacom_wac->is_soft_touch_switch = true;
+		}
+		fallthrough;
+
 	case MTSCREEN:
 	case MTTPC:
 	case MTTPC_B:
 	case TABLETPC2FG:
 		input_mt_init_slots(input_dev, features->touch_max, INPUT_MT_DIRECT);
-		/*fall through */
+		fallthrough;
 
 	case TABLETPC:
 	case TABLETPCE:
@@ -3704,7 +4024,7 @@ int wacom_setup_touch_input_capabilities(struct input_dev *input_dev,
 	case INTUOSHT2:
 		input_dev->evbit[0] |= BIT_MASK(EV_SW);
 		__set_bit(SW_MUTE_DEVICE, input_dev->swbit);
-		/* fall through */
+		fallthrough;
 
 	case BAMBOO_PT:
 	case BAMBOO_TOUCH:
@@ -3787,7 +4107,7 @@ static void wacom_24hd_update_leds(struct wacom *wacom, int mask, int group)
 static bool wacom_is_led_toggled(struct wacom *wacom, int button_count,
 				 int mask, int group)
 {
-	int button_per_group;
+	int group_button;
 
 	/*
 	 * 21UX2 has LED group 1 to the left and LED group 0
@@ -3797,9 +4117,12 @@ static bool wacom_is_led_toggled(struct wacom *wacom, int button_count,
 	if (wacom->wacom_wac.features.type == WACOM_21UX2)
 		group = 1 - group;
 
-	button_per_group = button_count/wacom->led.count;
+	group_button = group * (button_count/wacom->led.count);
 
-	return mask & (1 << (group * button_per_group));
+	if (wacom->wacom_wac.features.type == INTUOSP2_BT)
+		group_button = 8;
+
+	return mask & (1 << group_button);
 }
 
 static void wacom_update_led(struct wacom *wacom, int button_count, int mask,
@@ -3921,6 +4244,12 @@ int wacom_setup_pad_input_capabilities(struct input_dev *input_dev,
 		__set_bit(KEY_PROG2, input_dev->keybit);
 		__set_bit(KEY_PROG3, input_dev->keybit);
 
+		__set_bit(KEY_ONSCREEN_KEYBOARD, input_dev->keybit);
+		__set_bit(KEY_INFO, input_dev->keybit);
+
+		if (!features->oPid)
+			__set_bit(KEY_BUTTONCONFIG, input_dev->keybit);
+
 		input_set_abs_params(input_dev, ABS_WHEEL, 0, 71, 0, 0);
 		input_set_abs_params(input_dev, ABS_THROTTLE, 0, 71, 0, 0);
 		break;
@@ -3929,6 +4258,12 @@ int wacom_setup_pad_input_capabilities(struct input_dev *input_dev,
 		__set_bit(KEY_PROG1, input_dev->keybit);
 		__set_bit(KEY_PROG2, input_dev->keybit);
 		__set_bit(KEY_PROG3, input_dev->keybit);
+
+		__set_bit(KEY_ONSCREEN_KEYBOARD, input_dev->keybit);
+		__set_bit(KEY_BUTTONCONFIG, input_dev->keybit);
+
+		if (!features->oPid)
+			__set_bit(KEY_CONTROLPANEL, input_dev->keybit);
 		input_set_abs_params(input_dev, ABS_X, -2048, 2048, 0, 0);
 		input_abs_set_res(input_dev, ABS_X, 1024); /* points/g */
 		input_set_abs_params(input_dev, ABS_Y, -2048, 2048, 0, 0);
@@ -3942,7 +4277,10 @@ int wacom_setup_pad_input_capabilities(struct input_dev *input_dev,
 		__set_bit(KEY_PROG1, input_dev->keybit);
 		__set_bit(KEY_PROG2, input_dev->keybit);
 		__set_bit(KEY_PROG3, input_dev->keybit);
-		/* fall through */
+
+		__set_bit(KEY_BUTTONCONFIG, input_dev->keybit);
+		__set_bit(KEY_INFO, input_dev->keybit);
+		fallthrough;
 
 	case WACOM_21UX2:
 	case WACOM_BEE:
@@ -3958,7 +4296,7 @@ int wacom_setup_pad_input_capabilities(struct input_dev *input_dev,
 	case INTUOS3:
 	case INTUOS3L:
 		input_set_abs_params(input_dev, ABS_RY, 0, 4096, 0, 0);
-		/* fall through */
+		fallthrough;
 
 	case INTUOS3S:
 		input_set_abs_params(input_dev, ABS_RX, 0, 4096, 0, 0);
@@ -3971,6 +4309,7 @@ int wacom_setup_pad_input_capabilities(struct input_dev *input_dev,
 	case INTUOS5S:
 	case INTUOSPS:
 	case INTUOSP2_BT:
+	case INTUOSP2S_BT:
 		input_set_abs_params(input_dev, ABS_WHEEL, 0, 71, 0, 0);
 		break;
 
@@ -3981,7 +4320,7 @@ int wacom_setup_pad_input_capabilities(struct input_dev *input_dev,
 		 * ID_INPUT_TABLET to be set.
 		 */
 		__set_bit(BTN_STYLUS, input_dev->keybit);
-		/* fall through */
+		fallthrough;
 
 	case INTUOS4:
 	case INTUOS4L:
@@ -4331,19 +4670,19 @@ static const struct wacom_features wacom_features_0x5E =
 	  .check_for_hid_type = true, .hid_type = HID_TYPE_USBNONE };
 static const struct wacom_features wacom_features_0x90 =
 	{ "Wacom ISDv4 90", 26202, 16325, 255, 0,
-	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
+	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES }; /* Pen-only */
 static const struct wacom_features wacom_features_0x93 =
 	{ "Wacom ISDv4 93", 26202, 16325, 255, 0,
-	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
+	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES, .touch_max = 1 };
 static const struct wacom_features wacom_features_0x97 =
 	{ "Wacom ISDv4 97", 26202, 16325, 511, 0,
-	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
+	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES }; /* Pen-only */
 static const struct wacom_features wacom_features_0x9A =
 	{ "Wacom ISDv4 9A", 26202, 16325, 255, 0,
-	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
+	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES, .touch_max = 1 };
 static const struct wacom_features wacom_features_0x9F =
 	{ "Wacom ISDv4 9F", 26202, 16325, 255, 0,
-	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
+	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES, .touch_max = 1 };
 static const struct wacom_features wacom_features_0xE2 =
 	{ "Wacom ISDv4 E2", 26202, 16325, 255, 0,
 	  TABLETPC2FG, WACOM_INTUOS_RES, WACOM_INTUOS_RES, .touch_max = 2 };
@@ -4358,13 +4697,13 @@ static const struct wacom_features wacom_features_0xE6 =
 	  TABLETPC2FG, WACOM_INTUOS_RES, WACOM_INTUOS_RES, .touch_max = 2 };
 static const struct wacom_features wacom_features_0xEC =
 	{ "Wacom ISDv4 EC", 25710, 14500, 255, 0,
-	  TABLETPC,    WACOM_INTUOS_RES, WACOM_INTUOS_RES };
+	  TABLETPC,    WACOM_INTUOS_RES, WACOM_INTUOS_RES }; /* Pen-only */
 static const struct wacom_features wacom_features_0xED =
 	{ "Wacom ISDv4 ED", 26202, 16325, 255, 0,
-	  TABLETPCE, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
+	  TABLETPCE, WACOM_INTUOS_RES, WACOM_INTUOS_RES, .touch_max = 1 };
 static const struct wacom_features wacom_features_0xEF =
 	{ "Wacom ISDv4 EF", 26202, 16325, 255, 0,
-	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
+	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES }; /* Pen-only */
 static const struct wacom_features wacom_features_0x100 =
 	{ "Wacom ISDv4 100", 26202, 16325, 255, 0,
 	  MTTPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
@@ -4382,10 +4721,10 @@ static const struct wacom_features wacom_features_0x10F =
 	  MTTPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
 static const struct wacom_features wacom_features_0x116 =
 	{ "Wacom ISDv4 116", 26202, 16325, 255, 0,
-	  TABLETPCE, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
+	  TABLETPCE, WACOM_INTUOS_RES, WACOM_INTUOS_RES, .touch_max = 1 };
 static const struct wacom_features wacom_features_0x12C =
 	{ "Wacom ISDv4 12C", 27848, 15752, 2047, 0,
-	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
+	  TABLETPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES }; /* Pen-only */
 static const struct wacom_features wacom_features_0x4001 =
 	{ "Wacom ISDv4 4001", 26202, 16325, 255, 0,
 	  MTTPC, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
@@ -4548,9 +4887,26 @@ static const struct wacom_features wacom_features_0x37A =
 static const struct wacom_features wacom_features_0x37B =
 	{ "Wacom One by Wacom M", 21600, 13500, 2047, 63,
 	  BAMBOO_PEN, WACOM_INTUOS_RES, WACOM_INTUOS_RES };
+static const struct wacom_features wacom_features_0x393 =
+	{ "Wacom Intuos Pro S", 31920, 19950, 8191, 63,
+	  INTUOSP2S_BT, WACOM_INTUOS3_RES, WACOM_INTUOS3_RES, 7,
+	  .touch_max = 10 };
+static const struct wacom_features wacom_features_0x3c6 =
+	{ "Wacom Intuos BT S", 15200, 9500, 4095, 63,
+	  INTUOSHT3_BT, WACOM_INTUOS_RES, WACOM_INTUOS_RES, 4 };
+static const struct wacom_features wacom_features_0x3c8 =
+	{ "Wacom Intuos BT M", 21600, 13500, 4095, 63,
+	  INTUOSHT3_BT, WACOM_INTUOS_RES, WACOM_INTUOS_RES, 4 };
+static const struct wacom_features wacom_features_0x3dd =
+	{ "Wacom Intuos Pro S", 31920, 19950, 8191, 63,
+	  INTUOSP2S_BT, WACOM_INTUOS3_RES, WACOM_INTUOS3_RES, 7,
+	  .touch_max = 10 };
 
 static const struct wacom_features wacom_features_HID_ANY_ID =
 	{ "Wacom HID", .type = HID_GENERIC, .oVid = HID_ANY_ID, .oPid = HID_ANY_ID };
+
+static const struct wacom_features wacom_features_0x94 =
+	{ "Wacom Bootloader", .type = BOOTLOADER };
 
 #define USB_DEVICE_WACOM(prod)						\
 	HID_DEVICE(BUS_USB, HID_GROUP_WACOM, USB_VENDOR_ID_WACOM, prod),\
@@ -4625,6 +4981,7 @@ const struct hid_device_id wacom_ids[] = {
 	{ USB_DEVICE_WACOM(0x84) },
 	{ USB_DEVICE_WACOM(0x90) },
 	{ USB_DEVICE_WACOM(0x93) },
+	{ USB_DEVICE_WACOM(0x94) },
 	{ USB_DEVICE_WACOM(0x97) },
 	{ USB_DEVICE_WACOM(0x9A) },
 	{ USB_DEVICE_WACOM(0x9F) },
@@ -4720,6 +5077,10 @@ const struct hid_device_id wacom_ids[] = {
 	{ BT_DEVICE_WACOM(0x379) },
 	{ USB_DEVICE_WACOM(0x37A) },
 	{ USB_DEVICE_WACOM(0x37B) },
+	{ BT_DEVICE_WACOM(0x393) },
+	{ BT_DEVICE_WACOM(0x3c6) },
+	{ BT_DEVICE_WACOM(0x3c8) },
+	{ BT_DEVICE_WACOM(0x3dd) },
 	{ USB_DEVICE_WACOM(0x4001) },
 	{ USB_DEVICE_WACOM(0x4004) },
 	{ USB_DEVICE_WACOM(0x5000) },

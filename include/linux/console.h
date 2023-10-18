@@ -14,6 +14,7 @@
 #ifndef _LINUX_CONSOLE_H_
 #define _LINUX_CONSOLE_H_ 1
 
+#include <linux/atomic.h>
 #include <linux/types.h>
 
 struct vc_data;
@@ -21,17 +22,14 @@ struct console_font_op;
 struct console_font;
 struct module;
 struct tty_struct;
-
-/*
- * this is what the terminal answers to a ESC-Z or csi0c query.
- */
-#define VT100ID "\033[?1;2c"
-#define VT102ID "\033[?6c"
+struct notifier_block;
 
 enum con_scroll {
 	SM_UP,
 	SM_DOWN,
 };
+
+enum vc_intensity;
 
 /**
  * struct consw - callbacks for consoles
@@ -64,7 +62,6 @@ struct consw {
 	int	(*con_font_get)(struct vc_data *vc, struct console_font *font);
 	int	(*con_font_default)(struct vc_data *vc,
 			struct console_font *font, char *name);
-	int	(*con_font_copy)(struct vc_data *vc, int con);
 	int     (*con_resize)(struct vc_data *vc, unsigned int width,
 			unsigned int height, unsigned int user);
 	void	(*con_set_palette)(struct vc_data *vc,
@@ -72,10 +69,11 @@ struct consw {
 	void	(*con_scrolldelta)(struct vc_data *vc, int lines);
 	int	(*con_set_origin)(struct vc_data *vc);
 	void	(*con_save_screen)(struct vc_data *vc);
-	u8	(*con_build_attr)(struct vc_data *vc, u8 color, u8 intensity,
-			u8 blink, u8 underline, u8 reverse, u8 italic);
+	u8	(*con_build_attr)(struct vc_data *vc, u8 color,
+			enum vc_intensity intensity,
+			bool blink, bool underline, bool reverse, bool italic);
 	void	(*con_invert_region)(struct vc_data *vc, u16 *p, int count);
-	u16    *(*con_screen_pos)(struct vc_data *vc, int offset);
+	u16    *(*con_screen_pos)(const struct vc_data *vc, int offset);
 	unsigned long (*con_getxy)(struct vc_data *vc, unsigned long position,
 			int *px, int *py);
 	/*
@@ -99,7 +97,6 @@ extern const struct consw *conswitchp;
 extern const struct consw dummy_con;	/* dummy console buffer */
 extern const struct consw vga_con;	/* VGA text console */
 extern const struct consw newport_con;	/* SGI Newport console  */
-extern const struct consw prom_con;	/* SPARC PROM console */
 
 int con_is_bound(const struct consw *csw);
 int do_unregister_con_driver(const struct consw *csw);
@@ -133,7 +130,7 @@ static inline int con_debug_leave(void)
  */
 
 #define CON_PRINTBUFFER	(1)
-#define CON_CONSDEV	(2) /* Last on the command line */
+#define CON_CONSDEV	(2) /* Preferred console, /dev/console */
 #define CON_ENABLED	(4)
 #define CON_BOOT	(8)
 #define CON_ANYTIME	(16) /* Safe to call when cpu is offline */
@@ -147,10 +144,15 @@ struct console {
 	struct tty_driver *(*device)(struct console *, int *);
 	void	(*unblank)(void);
 	int	(*setup)(struct console *, char *);
+	int	(*exit)(struct console *);
 	int	(*match)(struct console *, char *name, int idx, char *options);
 	short	flags;
 	short	index;
 	int	cflag;
+	uint	ispeed;
+	uint	ospeed;
+	u64	seq;
+	unsigned long dropped;
 	void	*data;
 	struct	 console *next;
 };
@@ -164,6 +166,11 @@ struct console {
 extern int console_set_on_cmdline;
 extern struct console *early_console;
 
+enum con_flush_mode {
+	CONSOLE_FLUSH_PENDING,
+	CONSOLE_REPLAY_ALL,
+};
+
 extern int add_preferred_console(char *name, int idx, char *options);
 extern void register_console(struct console *);
 extern int unregister_console(struct console *);
@@ -173,7 +180,7 @@ extern int console_trylock(void);
 extern void console_unlock(void);
 extern void console_conditional_schedule(void);
 extern void console_unblank(void);
-extern void console_flush_on_panic(void);
+extern void console_flush_on_panic(enum con_flush_mode mode);
 extern struct tty_driver *console_device(int *);
 extern void console_stop(struct console *);
 extern void console_start(struct console *);
@@ -194,17 +201,19 @@ extern void suspend_console(void);
 extern void resume_console(void);
 
 int mda_console_init(void);
-void prom_con_init(void);
 
 void vcs_make_sysfs(int index);
 void vcs_remove_sysfs(int index);
 
 /* Some debug stub to catch some of the obvious races in the VT code */
-#if 1
-#define WARN_CONSOLE_UNLOCKED()	WARN_ON(!is_console_locked() && !oops_in_progress)
-#else
-#define WARN_CONSOLE_UNLOCKED()
-#endif
+#define WARN_CONSOLE_UNLOCKED()						\
+	WARN_ON(!atomic_read(&ignore_console_lock_warning) &&		\
+		!is_console_locked() && !oops_in_progress)
+/*
+ * Increment ignore_console_lock_warning if you need to quiet
+ * WARN_CONSOLE_UNLOCKED() for debugging purposes.
+ */
+extern atomic_t ignore_console_lock_warning;
 
 /* VESA Blanking Levels */
 #define VESA_NO_BLANKING        0
@@ -212,12 +221,10 @@ void vcs_remove_sysfs(int index);
 #define VESA_HSYNC_SUSPEND      2
 #define VESA_POWERDOWN          3
 
-#ifdef CONFIG_VGA_CONSOLE
-extern bool vgacon_text_force(void);
-#else
-static inline bool vgacon_text_force(void) { return false; }
-#endif
-
 extern void console_init(void);
+
+/* For deferred console takeover */
+void dummycon_register_output_notifier(struct notifier_block *nb);
+void dummycon_unregister_output_notifier(struct notifier_block *nb);
 
 #endif /* _LINUX_CONSOLE_H */

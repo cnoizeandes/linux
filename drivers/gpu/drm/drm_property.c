@@ -21,7 +21,12 @@
  */
 
 #include <linux/export.h>
-#include <drm/drmP.h>
+#include <linux/uaccess.h>
+
+#include <drm/drm_crtc.h>
+#include <drm/drm_drv.h>
+#include <drm/drm_file.h>
+#include <drm/drm_framebuffer.h>
 #include <drm/drm_property.h>
 
 #include "drm_crtc_internal.h"
@@ -38,7 +43,7 @@
  * property types and ranges.
  *
  * Properties don't store the current value directly, but need to be
- * instatiated by attaching them to a &drm_mode_object with
+ * instantiated by attaching them to a &drm_mode_object with
  * drm_object_attach_property().
  *
  * Property values are only 64bit. To support bigger piles of data (like gamma
@@ -122,8 +127,7 @@ struct drm_property *drm_property_create(struct drm_device *dev,
 	property->num_values = num_values;
 	INIT_LIST_HEAD(&property->enum_list);
 
-	strncpy(property->name, name, DRM_PROP_NAME_LEN);
-	property->name[DRM_PROP_NAME_LEN-1] = '\0';
+	strscpy_pad(property->name, name, DRM_PROP_NAME_LEN);
 
 	list_add_tail(&property->head, &dev->mode_config.property_list);
 
@@ -169,9 +173,9 @@ struct drm_property *drm_property_create_enum(struct drm_device *dev,
 		return NULL;
 
 	for (i = 0; i < num_values; i++) {
-		ret = drm_property_add_enum(property, i,
-				      props[i].type,
-				      props[i].name);
+		ret = drm_property_add_enum(property,
+					    props[i].type,
+					    props[i].name);
 		if (ret) {
 			drm_property_destroy(dev, property);
 			return NULL;
@@ -209,7 +213,7 @@ struct drm_property *drm_property_create_bitmask(struct drm_device *dev,
 						 uint64_t supported_bits)
 {
 	struct drm_property *property;
-	int i, ret, index = 0;
+	int i, ret;
 	int num_values = hweight64(supported_bits);
 
 	flags |= DRM_MODE_PROP_BITMASK;
@@ -221,14 +225,9 @@ struct drm_property *drm_property_create_bitmask(struct drm_device *dev,
 		if (!(supported_bits & (1ULL << props[i].type)))
 			continue;
 
-		if (WARN_ON(index >= num_values)) {
-			drm_property_destroy(dev, property);
-			return NULL;
-		}
-
-		ret = drm_property_add_enum(property, index++,
-				      props[i].type,
-				      props[i].name);
+		ret = drm_property_add_enum(property,
+					    props[i].type,
+					    props[i].name);
 		if (ret) {
 			drm_property_destroy(dev, property);
 			return NULL;
@@ -376,7 +375,6 @@ EXPORT_SYMBOL(drm_property_create_bool);
 /**
  * drm_property_add_enum - add a possible value to an enumeration property
  * @property: enumeration property to change
- * @index: index of the new enumeration
  * @value: value of the new enumeration
  * @name: symbolic name of the new enumeration
  *
@@ -388,10 +386,11 @@ EXPORT_SYMBOL(drm_property_create_bool);
  * Returns:
  * Zero on success, error code on failure.
  */
-int drm_property_add_enum(struct drm_property *property, int index,
+int drm_property_add_enum(struct drm_property *property,
 			  uint64_t value, const char *name)
 {
 	struct drm_property_enum *prop_enum;
+	int index = 0;
 
 	if (WARN_ON(strlen(name) >= DRM_PROP_NAME_LEN))
 		return -EINVAL;
@@ -411,14 +410,17 @@ int drm_property_add_enum(struct drm_property *property, int index,
 	list_for_each_entry(prop_enum, &property->enum_list, head) {
 		if (WARN_ON(prop_enum->value == value))
 			return -EINVAL;
+		index++;
 	}
+
+	if (WARN_ON(index >= property->num_values))
+		return -EINVAL;
 
 	prop_enum = kzalloc(sizeof(struct drm_property_enum), GFP_KERNEL);
 	if (!prop_enum)
 		return -ENOMEM;
 
-	strncpy(prop_enum->name, name, DRM_PROP_NAME_LEN);
-	prop_enum->name[DRM_PROP_NAME_LEN-1] = '\0';
+	strscpy_pad(prop_enum->name, name, DRM_PROP_NAME_LEN);
 	prop_enum->value = value;
 
 	property->values[index] = value;
@@ -430,7 +432,7 @@ EXPORT_SYMBOL(drm_property_add_enum);
 /**
  * drm_property_destroy - destroy a drm property
  * @dev: drm device
- * @property: property to destry
+ * @property: property to destroy
  *
  * This function frees a property including any attached resources like
  * enumeration values.
@@ -465,14 +467,13 @@ int drm_mode_getproperty_ioctl(struct drm_device *dev,
 	uint64_t __user *values_ptr;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
-		return -EINVAL;
+		return -EOPNOTSUPP;
 
 	property = drm_property_find(dev, file_priv, out_resp->prop_id);
 	if (!property)
 		return -ENOENT;
 
-	strncpy(out_resp->name, property->name, DRM_PROP_NAME_LEN);
-	out_resp->name[DRM_PROP_NAME_LEN-1] = 0;
+	strscpy_pad(out_resp->name, property->name, DRM_PROP_NAME_LEN);
 	out_resp->flags = property->flags;
 
 	value_count = property->num_values;
@@ -533,7 +534,7 @@ static void drm_property_free_blob(struct kref *kref)
 
 	drm_mode_object_unregister(blob->dev, &blob->base);
 
-	kfree(blob);
+	kvfree(blob);
 }
 
 /**
@@ -557,10 +558,10 @@ drm_property_create_blob(struct drm_device *dev, size_t length,
 	struct drm_property_blob *blob;
 	int ret;
 
-	if (!length || length > ULONG_MAX - sizeof(struct drm_property_blob))
+	if (!length || length > INT_MAX - sizeof(struct drm_property_blob))
 		return ERR_PTR(-EINVAL);
 
-	blob = kzalloc(sizeof(struct drm_property_blob)+length, GFP_KERNEL);
+	blob = kvzalloc(sizeof(struct drm_property_blob)+length, GFP_KERNEL);
 	if (!blob)
 		return ERR_PTR(-ENOMEM);
 
@@ -577,7 +578,7 @@ drm_property_create_blob(struct drm_device *dev, size_t length,
 	ret = __drm_mode_object_add(dev, &blob->base, DRM_MODE_OBJECT_BLOB,
 				    true, drm_property_free_blob);
 	if (ret) {
-		kfree(blob);
+		kvfree(blob);
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -640,7 +641,7 @@ EXPORT_SYMBOL(drm_property_blob_get);
  * @id: id of the blob property
  *
  * If successful, this takes an additional reference to the blob property.
- * callers need to make sure to eventually unreference the returned property
+ * callers need to make sure to eventually unreferenced the returned property
  * again, using drm_property_blob_put().
  *
  * Return:
@@ -758,7 +759,7 @@ int drm_mode_getblob_ioctl(struct drm_device *dev,
 	int ret = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
-		return -EINVAL;
+		return -EOPNOTSUPP;
 
 	blob = drm_property_lookup_blob(dev, out_resp->blob_id);
 	if (!blob)
@@ -787,7 +788,7 @@ int drm_mode_createblob_ioctl(struct drm_device *dev,
 	int ret = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
-		return -EINVAL;
+		return -EOPNOTSUPP;
 
 	blob = drm_property_create_blob(dev, out_resp->length, NULL);
 	if (IS_ERR(blob))
@@ -824,7 +825,7 @@ int drm_mode_destroyblob_ioctl(struct drm_device *dev,
 	int ret = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
-		return -EINVAL;
+		return -EOPNOTSUPP;
 
 	blob = drm_property_lookup_blob(dev, out_resp->blob_id);
 	if (!blob)
@@ -867,7 +868,7 @@ err:
  * value doesn't become invalid part way through the property update due to
  * race).  The value returned by reference via 'obj' should be passed back
  * to drm_property_change_valid_put() after the property is set (and the
- * object to which the property is attached has a chance to take it's own
+ * object to which the property is attached has a chance to take its own
  * reference).
  */
 bool drm_property_change_valid_get(struct drm_property *property,

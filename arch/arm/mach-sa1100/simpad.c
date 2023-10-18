@@ -18,7 +18,6 @@
 #include <linux/mtd/partitions.h>
 #include <linux/io.h>
 #include <linux/gpio/driver.h>
-#include <linux/gpio/machine.h>
 
 #include <mach/hardware.h>
 #include <asm/setup.h>
@@ -37,7 +36,7 @@
 #include <linux/input.h>
 #include <linux/gpio_keys.h>
 #include <linux/leds.h>
-#include <linux/i2c-gpio.h>
+#include <linux/platform_data/i2c-gpio.h>
 
 #include "generic.h"
 
@@ -327,7 +326,7 @@ static struct platform_device simpad_gpio_leds = {
  * i2c
  */
 static struct gpiod_lookup_table simpad_i2c_gpiod_table = {
-	.dev_id = "i2c-gpio",
+	.dev_id = "i2c-gpio.0",
 	.table = {
 		GPIO_LOOKUP_IDX("gpio", 21, NULL, 0,
 				GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),

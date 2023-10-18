@@ -25,7 +25,7 @@
 
 #include "dce_hwseq.h"
 #include "reg_helper.h"
-#include "hw_sequencer.h"
+#include "hw_sequencer_private.h"
 #include "core_types.h"
 
 #define CTX \
@@ -53,7 +53,8 @@ void dce_pipe_control_lock(struct dc *dc,
 	struct dce_hwseq *hws = dc->hwseq;
 
 	/* Not lock pipe when blank */
-	if (lock && pipe->stream_res.tg->funcs->is_blanked(pipe->stream_res.tg))
+	if (lock && pipe->stream_res.tg->funcs->is_blanked &&
+	    pipe->stream_res.tg->funcs->is_blanked(pipe->stream_res.tg))
 		return;
 
 	val = REG_GET_4(BLND_V_UPDATE_LOCK[pipe->stream_res.tg->inst],
@@ -83,6 +84,15 @@ void dce_pipe_control_lock(struct dc *dc,
 		}
 	}
 }
+
+#if defined(CONFIG_DRM_AMD_DC_SI)
+void dce60_pipe_control_lock(struct dc *dc,
+		struct pipe_ctx *pipe,
+		bool lock)
+{
+	/* DCE6 has no BLND_V_UPDATE_LOCK register */
+}
+#endif
 
 void dce_set_blender_mode(struct dce_hwseq *hws,
 	unsigned int blnd_inst,

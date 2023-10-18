@@ -71,7 +71,7 @@ static inline int
 wait_on_bit(unsigned long *word, int bit, unsigned mode)
 {
 	might_sleep();
-	if (!test_bit(bit, word))
+	if (!test_bit_acquire(bit, word))
 		return 0;
 	return out_of_line_wait_on_bit(word, bit,
 				       bit_wait,
@@ -96,7 +96,7 @@ static inline int
 wait_on_bit_io(unsigned long *word, int bit, unsigned mode)
 {
 	might_sleep();
-	if (!test_bit(bit, word))
+	if (!test_bit_acquire(bit, word))
 		return 0;
 	return out_of_line_wait_on_bit(word, bit,
 				       bit_wait_io,
@@ -123,7 +123,7 @@ wait_on_bit_timeout(unsigned long *word, int bit, unsigned mode,
 		    unsigned long timeout)
 {
 	might_sleep();
-	if (!test_bit(bit, word))
+	if (!test_bit_acquire(bit, word))
 		return 0;
 	return out_of_line_wait_on_bit_timeout(word, bit,
 					       bit_wait_timeout,
@@ -151,7 +151,7 @@ wait_on_bit_action(unsigned long *word, int bit, wait_bit_action_f *action,
 		   unsigned mode)
 {
 	might_sleep();
-	if (!test_bit(bit, word))
+	if (!test_bit_acquire(bit, word))
 		return 0;
 	return out_of_line_wait_on_bit(word, bit, action, mode);
 }
@@ -304,5 +304,35 @@ do {									\
 		__ret = __wait_var_event_timeout(var, condition, timeout); \
 	__ret;								\
 })
+
+#define __wait_var_event_interruptible(var, condition)			\
+	___wait_var_event(var, condition, TASK_INTERRUPTIBLE, 0, 0,	\
+			  schedule())
+
+#define wait_var_event_interruptible(var, condition)			\
+({									\
+	int __ret = 0;							\
+	might_sleep();							\
+	if (!(condition))						\
+		__ret = __wait_var_event_interruptible(var, condition);	\
+	__ret;								\
+})
+
+/**
+ * clear_and_wake_up_bit - clear a bit and wake up anyone waiting on that bit
+ *
+ * @bit: the bit of the word being waited on
+ * @word: the word being waited on, a kernel virtual address
+ *
+ * You can use this helper if bitflags are manipulated atomically rather than
+ * non-atomically under a lock.
+ */
+static inline void clear_and_wake_up_bit(int bit, void *word)
+{
+	clear_bit_unlock(bit, word);
+	/* See wake_up_bit() for which memory barrier you need to use. */
+	smp_mb__after_atomic();
+	wake_up_bit(word, bit);
+}
 
 #endif /* _LINUX_WAIT_BIT_H */

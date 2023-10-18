@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: ((GPL-2.0 WITH Linux-syscall-note) OR BSD-2-Clause) */
+/* SPDX-License-Identifier: ((GPL-2.0 WITH Linux-syscall-note) OR Linux-OpenIB) */
 /*
  * Copyright (c) 2016 Mellanox Technologies, LTD. All rights reserved.
  *
@@ -43,7 +43,7 @@
 
 /*
  * General blocks assignments
- * It is closed on purpose do not expose it it user space
+ * It is closed on purpose - do not expose it to user space
  * #define MAD_CMD_BASE		0x00
  * #define HFI1_CMD_BAS		0xE0
  */

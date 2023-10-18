@@ -119,6 +119,7 @@
 #include <linux/clk.h>
 #include <linux/bitrev.h>
 #include <linux/crc32.h>
+#include <linux/crc32poly.h>
 
 #include "xgbe.h"
 #include "xgbe-common.h"
@@ -523,19 +524,28 @@ static void xgbe_disable_vxlan(struct xgbe_prv_data *pdata)
 	netif_dbg(pdata, drv, pdata->netdev, "VXLAN acceleration disabled\n");
 }
 
+static unsigned int xgbe_get_fc_queue_count(struct xgbe_prv_data *pdata)
+{
+	unsigned int max_q_count = XGMAC_MAX_FLOW_CONTROL_QUEUES;
+
+	/* From MAC ver 30H the TFCR is per priority, instead of per queue */
+	if (XGMAC_GET_BITS(pdata->hw_feat.version, MAC_VR, SNPSVER) >= 0x30)
+		return max_q_count;
+	else
+		return min_t(unsigned int, pdata->tx_q_count, max_q_count);
+}
+
 static int xgbe_disable_tx_flow_control(struct xgbe_prv_data *pdata)
 {
-	unsigned int max_q_count, q_count;
 	unsigned int reg, reg_val;
-	unsigned int i;
+	unsigned int i, q_count;
 
 	/* Clear MTL flow control */
 	for (i = 0; i < pdata->rx_q_count; i++)
 		XGMAC_MTL_IOWRITE_BITS(pdata, i, MTL_Q_RQOMR, EHFC, 0);
 
 	/* Clear MAC flow control */
-	max_q_count = XGMAC_MAX_FLOW_CONTROL_QUEUES;
-	q_count = min_t(unsigned int, pdata->tx_q_count, max_q_count);
+	q_count = xgbe_get_fc_queue_count(pdata);
 	reg = MAC_Q0TFCR;
 	for (i = 0; i < q_count; i++) {
 		reg_val = XGMAC_IOREAD(pdata, reg);
@@ -552,9 +562,8 @@ static int xgbe_enable_tx_flow_control(struct xgbe_prv_data *pdata)
 {
 	struct ieee_pfc *pfc = pdata->pfc;
 	struct ieee_ets *ets = pdata->ets;
-	unsigned int max_q_count, q_count;
 	unsigned int reg, reg_val;
-	unsigned int i;
+	unsigned int i, q_count;
 
 	/* Set MTL flow control */
 	for (i = 0; i < pdata->rx_q_count; i++) {
@@ -578,8 +587,7 @@ static int xgbe_enable_tx_flow_control(struct xgbe_prv_data *pdata)
 	}
 
 	/* Set MAC flow control */
-	max_q_count = XGMAC_MAX_FLOW_CONTROL_QUEUES;
-	q_count = min_t(unsigned int, pdata->tx_q_count, max_q_count);
+	q_count = xgbe_get_fc_queue_count(pdata);
 	reg = MAC_Q0TFCR;
 	for (i = 0; i < q_count; i++) {
 		reg_val = XGMAC_IOREAD(pdata, reg);
@@ -887,7 +895,6 @@ static int xgbe_disable_rx_vlan_filtering(struct xgbe_prv_data *pdata)
 
 static u32 xgbe_vid_crc32_le(__le16 vid_le)
 {
-	u32 poly = 0xedb88320;	/* CRCPOLY_LE */
 	u32 crc = ~0;
 	u32 temp = 0;
 	unsigned char *data = (unsigned char *)&vid_le;
@@ -904,7 +911,7 @@ static u32 xgbe_vid_crc32_le(__le16 vid_le)
 		data_byte >>= 1;
 
 		if (temp)
-			crc ^= poly;
+			crc ^= CRC32_POLY_LE;
 	}
 
 	return crc;
@@ -1080,7 +1087,7 @@ static int xgbe_add_mac_addresses(struct xgbe_prv_data *pdata)
 	return 0;
 }
 
-static int xgbe_set_mac_address(struct xgbe_prv_data *pdata, u8 *addr)
+static int xgbe_set_mac_address(struct xgbe_prv_data *pdata, const u8 *addr)
 {
 	unsigned int mac_addr_hi, mac_addr_lo;
 
@@ -1284,6 +1291,20 @@ static void xgbe_write_mmd_regs(struct xgbe_prv_data *pdata, int prtad,
 	}
 }
 
+static unsigned int xgbe_create_mdio_sca(int port, int reg)
+{
+	unsigned int mdio_sca, da;
+
+	da = (reg & MII_ADDR_C45) ? reg >> 16 : 0;
+
+	mdio_sca = 0;
+	XGMAC_SET_BITS(mdio_sca, MAC_MDIOSCAR, RA, reg);
+	XGMAC_SET_BITS(mdio_sca, MAC_MDIOSCAR, PA, port);
+	XGMAC_SET_BITS(mdio_sca, MAC_MDIOSCAR, DA, da);
+
+	return mdio_sca;
+}
+
 static int xgbe_write_ext_mii_regs(struct xgbe_prv_data *pdata, int addr,
 				   int reg, u16 val)
 {
@@ -1291,9 +1312,7 @@ static int xgbe_write_ext_mii_regs(struct xgbe_prv_data *pdata, int addr,
 
 	reinit_completion(&pdata->mdio_complete);
 
-	mdio_sca = 0;
-	XGMAC_SET_BITS(mdio_sca, MAC_MDIOSCAR, REG, reg);
-	XGMAC_SET_BITS(mdio_sca, MAC_MDIOSCAR, DA, addr);
+	mdio_sca = xgbe_create_mdio_sca(addr, reg);
 	XGMAC_IOWRITE(pdata, MAC_MDIOSCAR, mdio_sca);
 
 	mdio_sccd = 0;
@@ -1317,9 +1336,7 @@ static int xgbe_read_ext_mii_regs(struct xgbe_prv_data *pdata, int addr,
 
 	reinit_completion(&pdata->mdio_complete);
 
-	mdio_sca = 0;
-	XGMAC_SET_BITS(mdio_sca, MAC_MDIOSCAR, REG, reg);
-	XGMAC_SET_BITS(mdio_sca, MAC_MDIOSCAR, DA, addr);
+	mdio_sca = xgbe_create_mdio_sca(addr, reg);
 	XGMAC_IOWRITE(pdata, MAC_MDIOSCAR, mdio_sca);
 
 	mdio_sccd = 0;
@@ -1877,7 +1894,7 @@ static void xgbe_dev_xmit(struct xgbe_channel *channel)
 	smp_wmb();
 
 	ring->cur = cur_index + 1;
-	if (!packet->skb->xmit_more ||
+	if (!netdev_xmit_more() ||
 	    netif_xmit_stopped(netdev_get_tx_queue(pdata->netdev,
 						   channel->queue_index)))
 		xgbe_tx_start_xmit(channel, ring);

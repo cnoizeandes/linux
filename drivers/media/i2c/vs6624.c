@@ -1,16 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * vs6624.c ST VS6624 CMOS image sensor driver
  *
  * Copyright (c) 2011 Analog Devices Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include <linux/delay.h>
@@ -554,7 +546,7 @@ static int vs6624_s_ctrl(struct v4l2_ctrl *ctrl)
 }
 
 static int vs6624_enum_mbus_code(struct v4l2_subdev *sd,
-		struct v4l2_subdev_pad_config *cfg,
+		struct v4l2_subdev_state *sd_state,
 		struct v4l2_subdev_mbus_code_enum *code)
 {
 	if (code->pad || code->index >= ARRAY_SIZE(vs6624_formats))
@@ -565,7 +557,7 @@ static int vs6624_enum_mbus_code(struct v4l2_subdev *sd,
 }
 
 static int vs6624_set_fmt(struct v4l2_subdev *sd,
-		struct v4l2_subdev_pad_config *cfg,
+		struct v4l2_subdev_state *sd_state,
 		struct v4l2_subdev_format *format)
 {
 	struct v4l2_mbus_framefmt *fmt = &format->format;
@@ -595,7 +587,7 @@ static int vs6624_set_fmt(struct v4l2_subdev *sd,
 	fmt->colorspace = vs6624_formats[index].colorspace;
 
 	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
-		cfg->try_fmt = *fmt;
+		sd_state->pads->try_fmt = *fmt;
 		return 0;
 	}
 
@@ -645,7 +637,7 @@ static int vs6624_set_fmt(struct v4l2_subdev *sd,
 }
 
 static int vs6624_get_fmt(struct v4l2_subdev *sd,
-		struct v4l2_subdev_pad_config *cfg,
+		struct v4l2_subdev_state *sd_state,
 		struct v4l2_subdev_format *format)
 {
 	struct vs6624 *sensor = to_vs6624(sd);
@@ -770,7 +762,7 @@ static int vs6624_probe(struct i2c_client *client,
 		return ret;
 	}
 	/* wait 100ms before any further i2c writes are performed */
-	mdelay(100);
+	msleep(100);
 
 	sensor = devm_kzalloc(&client->dev, sizeof(*sensor), GFP_KERNEL);
 	if (sensor == NULL)
@@ -782,7 +774,7 @@ static int vs6624_probe(struct i2c_client *client,
 	vs6624_writeregs(sd, vs6624_p1);
 	vs6624_write(sd, VS6624_MICRO_EN, 0x2);
 	vs6624_write(sd, VS6624_DIO_EN, 0x1);
-	mdelay(10);
+	usleep_range(10000, 11000);
 	vs6624_writeregs(sd, vs6624_p2);
 
 	vs6624_writeregs(sd, vs6624_default);
@@ -832,13 +824,12 @@ static int vs6624_probe(struct i2c_client *client,
 	return ret;
 }
 
-static int vs6624_remove(struct i2c_client *client)
+static void vs6624_remove(struct i2c_client *client)
 {
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 
 	v4l2_device_unregister_subdev(sd);
 	v4l2_ctrl_handler_free(sd->ctrl_handler);
-	return 0;
 }
 
 static const struct i2c_device_id vs6624_id[] = {
