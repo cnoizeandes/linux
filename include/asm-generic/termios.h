@@ -18,7 +18,7 @@
  * Translate a "termio" structure into a "termios". Ugh.
  */
 static inline int user_termio_to_kernel_termios(struct ktermios *termios,
-						const struct termio __user *termio)
+						struct termio __user *termio)
 {
 	unsigned short tmp;
 

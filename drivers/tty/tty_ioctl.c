@@ -379,6 +379,7 @@ EXPORT_SYMBOL_GPL(tty_set_termios);
 /*
  * Translate a "termio" structure into a "termios". Ugh.
  */
+ #if 0
 __weak int user_termio_to_kernel_termios(struct ktermios *termios,
 						struct termio __user *termio)
 {
@@ -412,8 +413,9 @@ __weak int kernel_termios_to_user_termio(struct termio __user *termio,
 	memcpy(v.c_cc, termios->c_cc, NCC);
 	return copy_to_user(termio, &v, sizeof(struct termio));
 }
-
+#endif
 #ifdef TCGETS2
+#if 0
 __weak int user_termios_to_kernel_termios(struct ktermios *k,
 						 struct termios2 __user *u)
 {
@@ -434,7 +436,7 @@ __weak int kernel_termios_to_user_termios_1(struct termios __user *u,
 {
 	return copy_to_user(u, k, sizeof(struct termios));
 }
-
+#endif
 #else
 
 __weak int user_termios_to_kernel_termios(struct ktermios *k,
